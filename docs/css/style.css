@@ -516,3 +516,14 @@ table.doc .numc { text-align: right; font-variant-numeric: tabular-nums; }
 .login-card .stack .opp { display: grid; grid-template-columns: 1fr; gap: 0; }
 .trade-row { grid-template-columns: 36px minmax(0, 1fr) auto auto auto; }
 @media (max-width: 560px) { .trade-row { grid-template-columns: 36px minmax(0, 1fr) auto; } }
+
+/* räddning: instruktionen ligger nere så att målet och ringen syns */
+.prompt-layer.pr-save .pr-banner { top: auto; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+@media (max-height: 430px) {
+  .prompt-layer.pr-save .pr-banner { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); padding: 6px 12px 8px; width: min(520px, 70vw); }
+  .prompt-layer.pr-save .pr-banner b { font-size: 1.1rem; }
+  .prompt-layer.pr-save .pr-banner span { font-size: 0.8rem; }
+  .pr-zones { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .pr-zones button { min-height: 44px; font-size: 1rem; padding: 0 14px; }
+}
+.match.prompting .minimap { visibility: hidden; }

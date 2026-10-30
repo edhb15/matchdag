@@ -226,6 +226,12 @@
     inBox(side, x, y) { const gx = side === 0 ? 0 : L; return Math.abs(x - gx) < BOX_D && Math.abs(y - CY) < BOX_HW; }
     zoneOf(y) { return y < CY - 1.3 ? -1 : y > CY + 1.3 ? 1 : 0; }
     otherZone(z) { const o = [-1, 0, 1].filter(v => v !== z); return o[(this.rng() * 2) | 0]; }
+    // Dök målvakten åt rätt håll? Skott nära gränsen mellan två zoner räknas som rätt åt båda hållen.
+    zoneMatches(dir, y, tol) {
+      const lo = dir < 0 ? -Infinity : dir === 0 ? CY - 1.3 : CY + 1.3;
+      const hi = dir < 0 ? CY - 1.3 : dir === 0 ? CY + 1.3 : Infinity;
+      return y >= lo - tol && y <= hi + tol;
+    }
     diff(side) { return this.human[side] ? DIFF.medium : DIFF[this.difficulty] || DIFF.medium; }
 
     emit(type, data) {
@@ -663,7 +669,8 @@
       if (this.human[1 - pen.side]) dir = pen.dive;
       else dir = this.rng() < 0.33 + K.s.diving / 400 ? zone : this.otherZone(zone);
       let save = false;
-      if (onTarget && dir === zone) {
+      const humanKeeper = this.human[1 - pen.side];
+      if (onTarget && (humanKeeper ? this.zoneMatches(dir, cross.y, 0.5) : dir === zone)) {
         let p = K.s.diving / 100;
         if (!this.human[1 - pen.side] && (Math.abs(cross.y - CY) > 2.6 || cross.z > 1.7)) p *= 0.75;
         save = this.rng() < p;
@@ -1251,15 +1258,18 @@
       const gx = s.defSide === 0 ? 0 : L;
       if (this.human[s.defSide]) {
         if (!o_isCamFixed(this.cam)) this.cam = { mode: 'save', from: { x: shooter.x, y: shooter.y }, goalX: gx };
-        this.openPrompt({ type: 'save', side: s.defSide, slowmo: true, timeout: 2.2, def: { dir: null }, data: { goalX: gx, from: { x: shooter.x, y: shooter.y }, kmh: Math.round(s.kmh), name: K.name, diving: K.s.diving } }, a => {
+        // cross = där bollen kommer att passera mållinjen; visas som en ring så att man ser vart skottet går
+        const cross = { y: Math.round(s.cross.y * 100) / 100, z: Math.round(s.cross.z * 100) / 100 };
+        this.openPrompt({ type: 'save', side: s.defSide, slowmo: true, timeout: 4, def: { dir: null }, data: { goalX: gx, from: { x: shooter.x, y: shooter.y }, kmh: Math.round(s.kmh), name: K.name, diving: K.s.diving, cross } }, a => {
           const dir = a && a.dir != null ? clamp(Math.round(a.dir), -1, 1) : null;
+          const correct = dir != null && this.zoneMatches(dir, s.cross.y, 0.7);
           s.diveDir = dir == null ? 0 : dir;
           if (dir == null) s.save = s.zone === 0 && this.rng() < K.s.diving / 200;
-          else s.save = dir === s.zone && this.rng() < K.s.diving / 100;
+          else s.save = correct && this.rng() < K.s.diving / 100;
           s.decided = true;
           if (!s.save) K.noTouch = 1.6;
           this.camHold = 1.1;
-          this.emit('dive', { side: s.defSide, dir, correct: dir === s.zone });
+          this.emit('dive', { side: s.defSide, dir, correct });
         });
       } else {
         const dir = this.rng() < 0.58 + K.s.diving / 250 ? s.zone : this.otherZone(s.zone);

@@ -462,7 +462,8 @@
       if (pr.type === 'save') {
         el.innerHTML = `
           <div class="pr-banner"><b>${pr.data.penalty ? 'Rädda straffen!' : 'Skott mot mål!'}</b>
-            <span>Dra åt det håll ${esc(pr.data.name)} ska dyka. Rätt håll = ${pr.data.diving} % chans att rädda.</span>${timer}</div>
+            <span>${pr.data.cross ? `Bollen går mot den gula ringen. Dra åt det hållet – då har ${esc(pr.data.name)} ${pr.data.diving} % chans att rädda.`
+              : `Dra åt det håll ${esc(pr.data.name)} ska dyka. Rätt håll = ${pr.data.diving} % chans att rädda.`}</span>${timer}</div>
           <div class="pr-capture"></div>
           <div class="pr-zones">
             <button type="button" data-z="-1">← Vänster</button>
@@ -633,7 +634,25 @@
       const ctx = this.renderer.ctx, dpr = this.renderer.dpr;
       ctx.save();
       ctx.scale(dpr, dpr);
-      if (pr.type === 'penalty') {
+      if (pr.type === 'save' && pr.data.cross) {
+        // visa vart skottet är på väg: en pulserande ring i målet och en streckad linje från bollen
+        const t = this.renderer.worldToScreen(pr.data.goalX, pr.data.cross.y, pr.data.cross.z);
+        const b = this.renderer.screen.get('ball');
+        if (t) {
+          const pulse = Math.sin(performance.now() / 160) * 4;
+          if (b) {
+            ctx.setLineDash([8, 8]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,210,63,0.75)';
+            ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(t.x, t.y); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+          ctx.fillStyle = 'rgba(255,210,63,0.22)';
+          ctx.beginPath(); ctx.arc(t.x, t.y, 26 + pulse, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 4; ctx.strokeStyle = '#ffd23f';
+          ctx.beginPath(); ctx.arc(t.x, t.y, 26 + pulse, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = '#ffd23f';
+          ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (pr.type === 'penalty') {
         let pt = this.penAim.hover;
         if (!pt && this.penAim.key) pt = this.renderer.worldToScreen(pr.data.goalX, this.penAim.y, this.penAim.z);
         if (pt) crosshair(ctx, pt.x, pt.y);

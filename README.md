@@ -86,7 +86,7 @@ Skapa ett konto med namn, PIN-kod och klubbnamn. Varje kompis skapar sitt eget k
 | Turnering mot datorlag med insats | 8 lag, kvartsfinal → final. Vinnaren tar hela potten (8 × insatsen) |
 | Frispark med mur och ritad linje | Rita en linje från bollen; böj den för skruv. För mycket skruv eller för långt åt sidan = bollen går inte dit du vill |
 | Straffar: tryck där du vill skjuta | Tryck i målet |
-| Rädda straff/skott: dra åt ett håll | Rätt håll = diving-värdet i procent chans att rädda. Fungerar likadant när motståndaren skjuter i spelet (slowmotion) |
+| Rädda straff/skott: dra åt ett håll | Rätt håll = diving-värdet i procent chans att rädda. När motståndaren skjuter i spelet blir det slowmotion, en gul ring visar vart skottet går och du har 4 sekunder på dig. Skott nära gränsen mellan två håll räknas som rätt åt båda |
 | Pengar när man vinner | Snabbmatch: 150 / 300 / 550 för vinst (lätt/medel/svår), turnering +100 per vinst, kompismatch potten + 250 |
 
 ## Så räknar spelet
