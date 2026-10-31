@@ -1,6 +1,6 @@
 # SPELARDOKUMENT – här finns alla spelare som går att köpa i affären.
 # Ändra fritt: namn, värden och priser. Spara filen så syns ändringarna direkt i spelet (ladda om sidan).
-# Du kan också redigera dokumentet inne i spelet under "Spelardokument".
+# Du kan också redigera dokumentet inne i spelet under Spelardokument.
 # Kolumnerna skiljs åt med semikolon (;). Filen går att öppna i Excel, Numbers eller Google Kalkylark.
 #
 # position: MV = målvakt, B = back, M = mittfältare, A = anfallare
@@ -44,3 +44,4 @@ id;namn;position;land;shooting;passing;dribbling;defending;pace;stamina;diving;p
 34;Olle Björk;MV;Sverige;;64;;;;;72;2800
 35;Thomas Weber;MV;Tyskland;;75;;;;;88;6200
 36;David Owusu;MV;Ghana;;60;;;;;70;2450
+37;Edward Briggs;MV;sverige;100;;;;;100;1
