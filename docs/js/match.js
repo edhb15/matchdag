@@ -226,6 +226,22 @@
     inBox(side, x, y) { const gx = side === 0 ? 0 : L; return Math.abs(x - gx) < BOX_D && Math.abs(y - CY) < BOX_HW; }
     zoneOf(y) { return y < CY - 1.3 ? -1 : y > CY + 1.3 ? 1 : 0; }
     otherZone(z) { const o = [-1, 0, 1].filter(v => v !== z); return o[(this.rng() * 2) | 0]; }
+    // Målvakten som håller bollen med händerna i sitt straffområde, annars null
+    keeperHolding() {
+      const o = this.ball.owner;
+      return o && o.slot === 0 && this.phase === 'play' && this.inBox(o.side, o.x, o.y) ? o : null;
+    }
+    // Står spelaren för nära målvakten som håller bollen (i straffområdet eller strax utanför)?
+    insideRetreat(K, p) {
+      const gx = K.side === 0 ? 0 : L, s = K.side === 0 ? 1 : -1;
+      return (p.x - (gx + s * (BOX_D + 1))) * s < 0 && Math.abs(p.y - CY) < BOX_HW + 1;
+    }
+    // Närmaste punkt utanför straffområdet att backa till
+    retreatTarget(K, x, y) {
+      const gx = K.side === 0 ? 0 : L, s = K.side === 0 ? 1 : -1, edge = gx + s * (BOX_D + 2.5);
+      if ((x - edge) * s < 0 && Math.abs(y - CY) < BOX_HW + 2) x = edge;
+      return [x, y];
+    }
     // Dök målvakten åt rätt håll? Skott nära gränsen mellan två zoner räknas som rätt åt båda hållen.
     zoneMatches(dir, y, tol) {
       const lo = dir < 0 ? -Infinity : dir === 0 ? CY - 1.3 : CY + 1.3;
@@ -798,6 +814,8 @@
         const ctl = this.human[t.side] ? t.controlled : null;
         for (const p of t.players) p.role = 'shape';
         if (this.phase !== 'play') continue;
+        const holder = this.keeperHolding();
+        if (holder && holder.side !== t.side) continue; // motståndarnas målvakt håller bollen – ingen pressar
         const cand = t.players.filter(p => p.pos !== 'MV' && p.state !== 'down' && p !== ctl);
         if (b.owner && b.owner.side !== t.side) {
           const c = b.owner;
@@ -848,6 +866,13 @@
         if (r.type === 'corner' && p.slot !== 0 && !humanCtl) { this.cornerPosition(p, r); return; }
       }
       if (humanCtl) {
+        const holder = ph === 'play' ? this.keeperHolding() : null;
+        if (holder && holder.side !== p.side && this.insideRetreat(holder, p)) {
+          // motståndarnas målvakt håller bollen: spelaren backar ut ur straffområdet
+          const [tx, ty] = this.retreatTarget(holder, p.x, p.y);
+          this.moveTo(p, tx, ty, 1, false);
+          return;
+        }
         const inp = this.inputs[p.side];
         const jm = hyp(inp.jx, inp.jy);
         if (jm > 0.12) { const k = Math.min(1, jm) / jm; it.mx = inp.jx * k; it.my = inp.jy * k; }
@@ -971,6 +996,8 @@
           ty = ty * 0.45 + (mk.y + (dy / d) * 1.8) * 0.55;
         }
       }
+      const holder = this.keeperHolding();
+      if (holder && holder.side !== p.side) [tx, ty] = this.retreatTarget(holder, tx, ty);
       const far = hyp(tx - p.x, ty - p.y);
       this.moveTo(p, tx, ty, far > 6 ? 1 : 0.75, far > 16 && !inPoss);
       if (far < 1.2) p.lookAt = Math.atan2(b.y - p.y, b.x - p.x);
@@ -978,6 +1005,7 @@
 
     tryStandingTackle(p, c, reach) {
       if (p.tackleCD > 0 || p.frozen > 0 || c.side === p.side || this.phase !== 'play') return;
+      if (c.slot === 0 && this.inBox(c.side, c.x, c.y)) return; // målvakten har bollen i händerna
       if (hyp(p.x - c.x, p.y - c.y) > reach) return;
       p.tackleCD = 0.55 + this.rng() * 0.5;
       const pr = clamp(0.2 + (p.s.defending - c.s.dribbling) / 200, 0.06, 0.5);
@@ -1088,8 +1116,9 @@
     aiKeeper(K, dt) {
       const t = this.teams[K.side], b = this.ball, gx = t.ownGoalX;
       if (b.owner === K) {
-        K.holdT += dt;
         if (K.holdT > 1.1 && this.phase === 'play') {
+          // vänta tills motståndarna har backat ut ur straffområdet (högst 4 sekunder)
+          if (K.holdT < 4 && this.inBox(K.side, K.x, K.y) && this.teams[1 - K.side].players.some(o => this.insideRetreat(K, o))) return;
           const o = this.passOptions(K);
           if (o.q && o.s > 4 && this.rng() < 0.7) this.doPass(K, o.q, {});
           else {

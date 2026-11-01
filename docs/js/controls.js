@@ -30,7 +30,7 @@
         teams: m.teams.map(q => ({ name: q.name, short: q.short, kit: q.kit, gkKit: q.gkKit })),
         controlled: c, hasBall: !!c && m.ball.owner === c,
         canKick: !!c && m.ball.owner === c && (m.phase === 'play' || (restartTaker && r.wait <= 0)),
-        restartTaker, restartType: r ? r.type : null, prompts: m.publicPrompts().filter(p => p.side === this.side),
+        restartTaker, restartType: r ? r.type : null, keeperHold: m.keeperHolding() ? m.keeperHolding().side : null, prompts: m.publicPrompts().filter(p => p.side === this.side),
         shootout: m.shootout ? m.shootoutScore() : null, drinks: m.drinks[this.side], subsLeft: t.subsLeft,
         players: t.players, bench: t.bench, ball: m.ball, stats: m.result().stats, scorers: m.scorers,
       };
@@ -348,6 +348,10 @@
           corner: `Hörna – ${how} för ett inlägg. Spelare i straffområdet nickar mot mål.`,
           throwin: `Inkast – ${how}`, goalkick: `Inspark – ${how}`, freekick: `Frispark – ${how}, eller håll in Skjut`,
         }[info.restartType] || '';
+      } else if (info.keeperHold != null && info.phase === 'play' && !info.prompts.length && !this.paused) {
+        hint = info.keeperHold === this.ad.side
+          ? 'Målvakten har bollen i händerna – motståndarna backar. Passa eller sparka ut.'
+          : 'Målvakten håller bollen – ditt lag backar ut ur straffområdet.';
       }
       if (hint !== this.hintText) { this.hintText = hint; this.hintEl.textContent = hint; this.hintEl.hidden = !hint; }
       // kraftmätare – visar spelets skottformel

@@ -216,11 +216,19 @@
       return {
         phase: s.ph, clock: s.clk, half: s.half, score: s.sc,
         teams: this.roster.map(t => ({ name: t.name, short: t.short, kit: t.kit, gkKit: t.gkKit })),
-        controlled: c, hasBall, canKick: hasBall && (s.ph === 'play' || (restartTaker && s.rs[1] === 1)), restartTaker, restartType: s.rs ? s.rs[2] : null,
+        keeperHold: this.keeperHoldSide(s), controlled: c, hasBall, canKick: hasBall && (s.ph === 'play' || (restartTaker && s.rs[1] === 1)), restartTaker, restartType: s.rs ? s.rs[2] : null,
         prompts: (s.pr || []).filter(p => p.side === 1 && !this.answered.has(p.id)),
         shootout: s.so, drinks: r1.drinks, subsLeft: r1.subsLeft,
         players: this.all.filter(p => p.side === 1), bench: r1.bench, ball: this.ball, stats: s.st,
       };
+    }
+
+    // Håller en målvakt bollen med händerna i sitt straffområde? (samma regel som i matchmotorn)
+    keeperHoldSide(s) {
+      const o = s.ph === 'play' && s.b[6] >= 0 ? this.all[s.b[6]] : null;
+      if (!o || o.slot !== 0) return null;
+      const gx = o.side === 0 ? 0 : E.L;
+      return Math.abs(o.x - gx) < E.BOX_D && Math.abs(o.y - E.CY) < E.BOX_HW ? o.side : null;
     }
 
     setInput(jx, jy, sprint) { this.inp = { jx, jy, sp: !!sprint }; }

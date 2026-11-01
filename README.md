@@ -97,6 +97,7 @@ Skapa ett konto med namn, PIN-kod och klubbnamn. Varje kompis skapar sitt eget k
 - **Stamina:** hur snabbt orken tar slut när man sprintar. Under 40 % ork går spelaren långsammare.
 - **Defending:** chansen att vinna bollen i tacklingar (och färre fouls).
 - **Diving:** när målvakten dyker åt rätt håll är chansen att rädda lika med diving i procent.
+- **Målvakten håller bollen:** när målvakten har bollen i händerna i straffområdet backar motståndarna ut ur straffområdet och får inte tackla honom. Datorns målvakt väntar tills de backat (högst 4 sekunder) innan den sparkar eller kastar ut bollen.
 - **Skador:** fouls kan ge skador. De läker efter 1, 3 eller 6 matcher – eller direkt i Sjukstugan för 100, 250 eller 600.
 - **Träning:** kostar 40 + 4 per poäng över 40 och ger +1 till +3.
 - **Pris:** räknas ut från spelarens totalbetyg om priset i `spelare.csv` lämnas tomt.
