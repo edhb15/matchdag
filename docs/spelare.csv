@@ -46,5 +46,7 @@ id;namn;position;land;shooting;passing;dribbling;defending;pace;stamina;diving;p
 36;David Owusu;MV;Ghana;;60;;;;;70;2450
 37;Edward Briggs;MV;sverige;;99;;;;;99;500
 38;Albert Henricson;A;sverige;99;99;99;99;99;;98;550
-39;August T;M;sverige;65;85;60;70;95;;95;200
-50;Marcos SR;MV;sverige;;75;;;;;80;350
+39;August;M;sverige;65;85;60;70;95;;95;200
+50;Marcos;MV;sverige;;75;;;;;80;350
+51;Henry;B;sverige;65;85;50;65;80;;75;
+52;Dominik;A;sverige;70;70;99;75;85;;85;
