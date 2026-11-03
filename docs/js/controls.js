@@ -20,6 +20,7 @@
       return {
         all: m.all, teams: m.teams, ball: m.ball, cam: m.cam, flip: this.flip, markers, netPulse: m.netPulse, time: m.time,
         ballOwned: !!m.ball.owner, celebrate: m.phase === 'goal' && m.celebrator ? m.celebrator.uid : null,
+        stadium: { level: m.teams[0].stadium || 3, seat: m.teams[0].kit.shirt, club: m.teams[0].name },
       };
     }
     info() {

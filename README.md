@@ -88,6 +88,9 @@ Skapa ett konto med namn, PIN-kod och klubbnamn. Varje kompis skapar sitt eget k
 | Straffar: tryck där du vill skjuta | Tryck i målet |
 | Rädda straff/skott: dra åt ett håll | Rätt håll = diving-värdet i procent chans att rädda. När motståndaren skjuter i spelet blir det slowmotion, en gul ring visar vart skottet går och du har 4 sekunder på dig. Skott nära gränsen mellan två håll räknas som rätt åt båda |
 | Pengar när man vinner | Snabbmatch: 150 / 300 / 550 för vinst (lätt/medel/svår), turnering +100 per vinst, kompismatch potten + 250 |
+| Lyckohjul en gång om dagen | **Lyckohjul** på startsidan: 10, 50, 100 eller 200 spelpengar, 1 eller 5 diamanter, en snurr till, ×3 spelpengar på nästa match eller jackpot (5 000 spelpengar + 20 diamanter). Små vinster är vanligast, och hjulet stannar ofta precis bredvid en bättre vinst |
+| Bygga ut arenan med diamanter | **Arena**: fem nivåer från Lokalplanen till Nationalarenan. Större arena = fler åskådare, finare läktare och biljettintäkter varje match mot datorn |
+| Se sin arena med knapparna ovanpå | Startsidan visar din egen arena (med ditt lag som värmer upp) och alla knappar ligger ovanpå |
 
 ## Så räknar spelet
 
@@ -101,6 +104,36 @@ Skapa ett konto med namn, PIN-kod och klubbnamn. Varje kompis skapar sitt eget k
 - **Skador:** fouls kan ge skador. De läker efter 1, 3 eller 6 matcher – eller direkt i Sjukstugan för 100, 250 eller 600.
 - **Träning:** kostar 40 + 4 per poäng över 40 och ger +1 till +3.
 - **Pris:** räknas ut från spelarens totalbetyg om priset i `spelare.csv` lämnas tomt.
+
+## Lyckohjul, diamanter och arena
+
+Du får en gratissnurr varje dag (ny snurr efter midnatt). Vinner du **Snurra igen** får du snurra direkt en gång till.
+
+| Vinst | Chans |
+|---|---|
+| 10 spelpengar | 25 % |
+| 50 spelpengar | 22 % |
+| 1 diamant | 15 % |
+| 100 spelpengar | 14 % |
+| Snurra igen | 8 % |
+| 200 spelpengar | 7 % |
+| ×3 spelpengar på nästa match | 5 % |
+| 5 diamanter | 3 % |
+| Jackpot: 5 000 spelpengar + 20 diamanter | 1 % |
+
+När hjulet stannar på en liten vinst som ligger bredvid en bättre, stannar pilen nära kanten mot den bättre – så det ser ut som att man nästan vann den. **×3** gäller spelpengarna du får för nästa match du spelar (mot datorn, i turneringen eller mot en kompis): vinstpengarna och biljettintäkterna. Insatser och turneringspotten räknas inte.
+
+Diamanter får du från lyckohjulet (och 5 när du startar ett lag). Med dem bygger du ut arenan:
+
+| Nivå | Arena | Kostar | Platser | Biljettintäkter per match mot datorn |
+|---|---|---|---|---|
+| 1 | Lokalplanen | – | 400 | 0 |
+| 2 | Idrottsplatsen | 5 diamanter | 4 000 | +25 |
+| 3 | Arenan | 10 diamanter | 15 000 | +60 |
+| 4 | Storarenan | 20 diamanter | 32 000 | +100 |
+| 5 | Nationalarenan | 40 diamanter | 60 000 | +150 |
+
+Arenan syns på startsidan och när du spelar hemma mot datorn. Chanserna och priserna står i `FB.WHEEL` och `FB.STADIUMS` i `docs/js/shared.js`.
 
 ## Spelardokumentet (`docs/spelare.csv`)
 
@@ -156,11 +189,11 @@ Mappen `docs` är själva spelet – det är den GitHub Pages publicerar och den
 | `docs/index.html` | Spelets sida |
 | `docs/spelare.csv` | Spelardokumentet |
 | `docs/js/match.js` | Matchmotorn: fysik, regler, datorspelare, frisparkar, straffar |
-| `docs/js/render.js` | Grafiken |
+| `docs/js/render.js` | Grafiken: matchen och de fem arenorna |
 | `docs/js/controls.js` | Joystick, knappar, ork, miniplan, paus, frispark/straff/räddning |
-| `docs/js/app.js` | Menyerna |
+| `docs/js/app.js` | Menyerna, startsidan med arenan, lyckohjulet |
 | `docs/js/shared.js` | Värden och formler (betyg, priser, skador, formationer, datorlag) |
-| `docs/js/logic.js` | Lagets regler: affär, träning, scouting, sjukstuga, turneringar, matchresultat |
+| `docs/js/logic.js` | Lagets regler: affär, träning, scouting, sjukstuga, turneringar, matchresultat, lyckohjul, arena |
 | `docs/js/local.js` | GitHub Pages-versionen: sparar laget i webbläsaren |
 | `docs/js/p2p.js` | GitHub Pages-versionen: spela och handla med kompis direkt mellan webbläsarna |
 | `docs/js/net.js` | Realtid mot kompis (värden kör matchen, gästen ser samma sak) |

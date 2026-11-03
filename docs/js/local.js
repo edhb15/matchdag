@@ -56,7 +56,7 @@
       const k = keyOf(b.name);
       if (!st.teams[k]) fail('Hittade inget lag med det namnet på den här enheten.');
       st.current = k;
-      return { token: k, profile: st.teams[k] };
+      return { token: k, profile: G.normalize(st.teams[k]) };
     },
     'POST /api/logout': () => { st.current = null; return { ok: true }; },
     'GET /api/profile': (b, u) => ({ profile: u }),
@@ -83,7 +83,7 @@
       let name = String(team.name).slice(0, 16), n = 2;
       while (st.teams[keyOf(name)]) name = `${String(team.name).slice(0, 13)} ${n++}`;
       team.name = name;
-      G.fixLineup(team);
+      G.normalize(team);
       st.teams[keyOf(name)] = team;
       st.current = keyOf(name);
       return { token: st.current, profile: team };
@@ -132,7 +132,7 @@
     if (!PUBLIC.has(key)) {
       u = me();
       if (!u) throw new G.GameError('Välj ditt lag igen.', 401);
-      G.fixLineup(u);
+      G.normalize(u);
     }
     let out;
     if (routes[key]) {

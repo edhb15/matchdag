@@ -12,6 +12,26 @@
   const SPONSORS = ['SKOGSKAFFE', 'NORDLJUS ENERGI', 'LAGOM BANK', 'FJÄLLSKOR', 'SMÅLANDS MEJERI', 'KUSTFÄRJAN', 'BOLLPLANKET', 'VÄSTANVIND'];
   const BOARD_COLORS = ['#0f3d6e', '#c8102e', '#f2b705', '#14532d', '#1f2937', '#7c3aed', '#0e7490', '#b45309'];
 
+  // Arenornas utseende, nivå 1–5. Läktare: far/near [x0, x1, d0, d1, z0, z1] (d = avstånd från långsidan),
+  // ends [sida, y0, y1, d0, d1, z0, z1] (d = avstånd bakom mållinjen). fill = hur fullsatt.
+  const NIGHT = ['#0b1220', '#18233a', '#0d1626'], DUSK = ['#24375a', '#5c6f97', '#d29a6a'];
+  const STADIUM_LOOK = {
+    1: { sky: ['#4a6f9e', '#93b2cf', '#e2c59a'], ground: '#2f5d2f', concrete: '#6b4a2f', fill: 0.3, trees: true,
+      far: [[36, 69, 6.5, 11, 0.7, 3.4]], ends: [], near: [] },
+    2: { sky: DUSK, ground: '#2b4f2c', concrete: '#7d8494', fill: 0.5,
+      far: [[-4, 109, 7, 20, 0.9, 7]], ends: [[-1, 4, 64, 9, 17, 0.9, 5], [1, 4, 64, 9, 17, 0.9, 5]], near: [[-4, 109, 8, 19, 0.9, 7]] },
+    3: { sky: NIGHT, ground: '#1c2230', concrete: '#525b6e', fill: 0.72, masts: true, roof: true,
+      far: [[-12, 117, 8, 32, 1.2, 16]], ends: [[-1, -8, 76, 9, 28, 1.2, 13], [1, -8, 76, 9, 28, 1.2, 13]], near: [[-12, 117, 8, 32, 1.2, 16]] },
+    4: { sky: NIGHT, ground: '#1a1f2c', concrete: '#4a5366', fill: 0.86, roof: true, roofEnds: true, banner: true, screen: true,
+      far: [[-14, 119, 8, 25, 1.2, 10], [-14, 119, 27, 46, 13, 27]],
+      ends: [[-1, -12, 80, 9, 23, 1.2, 9], [-1, -12, 80, 25, 40, 11, 22], [1, -12, 80, 9, 23, 1.2, 9], [1, -12, 80, 25, 40, 11, 22]],
+      near: [[-14, 119, 8, 25, 1.2, 10], [-14, 119, 27, 46, 13, 27]] },
+    5: { sky: NIGHT, ground: '#191d29', concrete: '#444d60', fill: 1, roof: true, roofEnds: true, banner: true, screen: true, ring: true, flags: true,
+      far: [[-34, 139, 8, 27, 1.2, 12], [-34, 139, 29, 56, 14, 36]],
+      ends: [[-1, -34, 102, 9, 27, 1.2, 11], [-1, -34, 102, 29, 52, 13, 32], [1, -34, 102, 9, 27, 1.2, 11], [1, -34, 102, 29, 52, 13, 32]],
+      near: [[-34, 139, 8, 27, 1.2, 12], [-34, 139, 29, 56, 14, 36]] },
+  };
+
   class Renderer {
     constructor(canvas) {
       this.cv = canvas;
@@ -52,21 +72,47 @@
         g.fillRect(x, y, 1 + rnd() * 1.5, 1 + rnd() * 2.5);
       }
       this.noise = this.ctx.createPattern(n, 'repeat');
-      // publik
-      const c = mk(240, 120), cg = c.getContext('2d');
-      cg.fillStyle = '#1b1f2a'; cg.fillRect(0, 0, 240, 120);
+      this.crowdCache = new Map();
+      this.setStadium(3, '#1f3c88');
+    }
+
+    // Publiken: fill = hur stor del av sätena som är fulla. Tomma säten har klubbens färg,
+    // och många på läktaren bär klubbens tröja.
+    crowdPattern(fill, seat) {
+      const key = fill + seat;
+      if (this.crowdCache.has(key)) return this.crowdCache.get(key);
+      const c = document.createElement('canvas');
+      c.width = 240; c.height = 120;
+      const g = c.getContext('2d');
+      let seed = 11;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      g.fillStyle = '#1b1f2a'; g.fillRect(0, 0, 240, 120);
       const shirts = ['#c8102e', '#f4f4f0', '#1f3c88', '#fecc02', '#2a2a2a', '#0b7a3e', '#e5e7eb', '#7c2d12', '#f97316', '#38bdf8'];
+      const seatDark = shade(seat, -0.35);
       for (let row = 0; row < 20; row++) {
         for (let col = 0; col < 48; col++) {
-          const x = col * 5 + (row % 2) * 2.5 + rnd() * 1.2, y = row * 6 + rnd();
-          cg.fillStyle = shirts[(rnd() * shirts.length) | 0];
-          cg.fillRect(x, y + 2.2, 3.4, 3.2);
-          cg.fillStyle = ['#f1c7a5', '#c68b5e', '#6e452b', '#e0ac85'][(rnd() * 4) | 0];
-          cg.beginPath(); cg.arc(x + 1.7, y + 1.4, 1.3, 0, 6.3); cg.fill();
+          const x = col * 5 + (row % 2) * 2.5, y = row * 6;
+          if (rnd() > fill) { g.fillStyle = seatDark; g.fillRect(x + 0.3, y + 2.4, 3.6, 3); continue; }
+          const jx = rnd() * 1.2, jy = rnd();
+          g.fillStyle = rnd() < 0.55 ? seat : shirts[(rnd() * shirts.length) | 0];
+          g.fillRect(x + jx, y + jy + 2.2, 3.4, 3.2);
+          g.fillStyle = ['#f1c7a5', '#c68b5e', '#6e452b', '#e0ac85'][(rnd() * 4) | 0];
+          g.beginPath(); g.arc(x + jx + 1.7, y + jy + 1.4, 1.3, 0, 6.3); g.fill();
         }
       }
-      this.crowdCanvas = c;
-      this.crowd = this.ctx.createPattern(c, 'repeat');
+      const pat = this.ctx.createPattern(c, 'repeat');
+      this.crowdCache.set(key, pat);
+      return pat;
+    }
+
+    // Vilken arena som ritas (hemmalagets nivå 1–5) och klubbens färg på sätena
+    setStadium(level, seat, club) {
+      level = Math.max(1, Math.min(5, level | 0 || 3));
+      seat = seat || '#1f3c88';
+      if (this.stadium && this.stadium.level === level && this.stadium.seat === seat && this.stadium.club === club) return;
+      const cfg = STADIUM_LOOK[level];
+      this.stadium = { level, seat, club: club || '', cfg };
+      this.crowd = this.crowdPattern(cfg.fill, seat);
     }
 
     // ------------------------------------------------------------ kamera
@@ -76,6 +122,29 @@
     desiredCamera(scene, dt) {
       const b = scene.ball, cm = scene.cam || { mode: 'side' };
       const bx = this.vx(b.x), by = this.vy(b.y);
+      if (cm.mode === 'hub') {
+        // startsidan: kameran glider sakta längs läktaren och arenan ritas i luckan mellan menyerna (cm.band)
+        const band = cm.band || [0, 1], bh = Math.max(0.12, band[1] - band[0]);
+        const portrait = this.cw < this.ch * bh * 1.6;
+        const sway = Math.sin(this.time * 0.05);
+        // på en smal, hög skärm tittar kameran in från ena kortsidan så att planen fyller bredden
+        const px = portrait ? -34 : L / 2 + sway * 30, py = portrait ? CY + sway * 12 : -58, pz = portrait ? 34 : 38;
+        const pts = portrait
+          ? [[-4, -6, 0], [-4, W + 6, 0], [L + 4, -4, 0], [L + 4, W + 4, 0], [L + 22, CY, 14]]
+          : [[-10, -6, 0], [L + 10, -6, 0], [-10, W + 8, 0], [L + 10, W + 8, 0], [L / 2, W + 26, 16], [L / 2, -12, 0]];
+        const dx = portrait ? L / 2 - px : L / 2 + sway * 8 - px, dy = portrait ? CY - sway * 4 - py : CY - py, d = hyp(dx, dy), ux = dx / d, uy = dy / d;
+        let h0 = 1e9, h1 = -1e9, v0 = 1e9, v1 = -1e9;
+        for (const [x, y, z] of pts) {
+          const vx = x - px, vy = y - py, hd = hyp(vx, vy);
+          const ah = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy), av = Math.atan2(z - pz, hd);
+          h0 = Math.min(h0, ah); h1 = Math.max(h1, ah); v0 = Math.min(v0, av); v1 = Math.max(v1, av);
+        }
+        const yaw = Math.atan2(uy, ux) + (h0 + h1) / 2, pitch = (v0 + v1) / 2;
+        return {
+          px, py, pz, tx: px + Math.cos(yaw) * Math.cos(pitch) * 20, ty: py + Math.sin(yaw) * Math.cos(pitch) * 20, tz: pz + Math.sin(pitch) * 20,
+          hh: (h1 - h0) / 2 + 0.02, hv: (v1 - v0) / 2 + 0.02, cy: (band[0] + band[1]) / 2, bh,
+        };
+      }
       if (cm.mode === 'side' || !cm.from) {
         const bvx = (this.flip ? -1 : 1) * (b.vx || 0);
         const look = clamp(bx + bvx * 0.35, 15, L - 15);
@@ -121,8 +190,9 @@
       let rx = fy, ry = -fx;
       const rl = hyp(rx, ry) || 1; rx /= rl; ry /= rl;
       const ux = ry * fz, uy = -rx * fz, uz = rx * fy - ry * fx;
-      const Fw = this.cw / 2 / Math.tan(c.hh), Fh = this.ch / 2 / Math.tan(c.hv);
-      this.c = { px: c.px, py: c.py, pz: c.pz, fx, fy, fz, rx, ry, ux, uy, uz, F: Math.min(Fw, Fh), cx: this.cw / 2, cy: this.ch * 0.5 };
+      // want.bh/cy: bilden ska rymmas i ett band av skärmen (startsidan), annars hela duken
+      const bh = want.bh || 1, Fw = this.cw / 2 / Math.tan(c.hh), Fh = (this.ch * bh) / 2 / Math.tan(c.hv);
+      this.c = { px: c.px, py: c.py, pz: c.pz, fx, fy, fz, rx, ry, ux, uy, uz, F: Math.min(Fw, Fh), cx: this.cw / 2, cy: this.ch * (want.cy || 0.5) };
     }
 
     toCam(x, y, z) {
@@ -170,12 +240,16 @@
     }
 
     // ------------------------------------------------------------ planen
-    drawBackground() {
-      const ctx = this.ctx;
+    drawBackground(scene) {
+      const ctx = this.ctx, st = this.stadium, cfg = st.cfg;
       const g = ctx.createLinearGradient(0, 0, 0, this.ch);
-      g.addColorStop(0, '#0b1220'); g.addColorStop(0.6, '#18233a'); g.addColorStop(1, '#0d1626');
+      cfg.sky.forEach((col, i) => g.addColorStop(i / (cfg.sky.length - 1), col));
       ctx.fillStyle = g; ctx.fillRect(0, 0, this.cw, this.ch);
-      // läktare
+      // marken runt arenan
+      this.fillPoly([[-260, -260, 0], [360, -260, 0], [360, 330, 0], [-260, 330, 0]], cfg.ground);
+      if (cfg.trees) this.drawTrees();
+      const hub = scene && scene.cam && scene.cam.mode === 'hub';
+      if (cfg.masts) this.drawMasts(hub);
       const crowdFill = (pts, cx, cy, cz) => {
         const p = this.proj(cx, cy, cz);
         if (p && this.crowd.setTransform) {
@@ -183,16 +257,148 @@
           this.crowd.setTransform(new DOMMatrix([k, 0, 0, k, p.x, p.y]));
         }
         this.fillPoly(pts, this.crowd);
-        this.fillPoly(pts, 'rgba(8,12,24,0.25)');
+        this.fillPoly(pts, 'rgba(8,12,24,0.22)');
       };
-      crowdFill([[-40, 77, 1.2], [145, 77, 1.2], [145, 108, 26], [-40, 108, 26]], 52, 90, 12);
-      this.fillPoly([[-40, 75.5, 0], [145, 75.5, 0], [145, 77, 1.2], [-40, 77, 1.2]], '#2a3144');
-      this.fillPoly([[-40, 108, 26], [145, 108, 26], [145, 112, 30], [-40, 112, 30]], '#0e1424');
-      crowdFill([[-9, -40, 1.2], [-9, 108, 1.2], [-40, 108, 24], [-40, -40, 24]], -24, 34, 12);
-      crowdFill([[L + 9, -40, 1.2], [L + 9, 108, 1.2], [L + 40, 108, 24], [L + 40, -40, 24]], L + 24, 34, 12);
-      crowdFill([[-40, -9, 1.2], [145, -9, 1.2], [145, -40, 24], [-40, -40, 24]], 52, -24, 12);
-      this.fillPoly([[-9, -12, 0], [-9, 80, 0], [-9, 80, 1.2], [-9, -12, 1.2]], '#2a3144');
-      this.fillPoly([[L + 9, -12, 0], [L + 9, 80, 0], [L + 9, 80, 1.2], [L + 9, -12, 1.2]], '#2a3144');
+      const concrete = cfg.concrete, top = '#0e1424';
+      // bortre långsidan (övre våningen först, den ligger längst bort)
+      for (const [x0, x1, d0, d1, z0, z1] of cfg.far.slice().sort((a, b) => b[2] - a[2])) {
+        const y0 = W + d0, y1 = W + d1;
+        this.fillPoly([[x0, y1, z1], [x1, y1, z1], [x1, y1 + 1.5, z1 + 2.5], [x0, y1 + 1.5, z1 + 2.5]], top);
+        crowdFill([[x0, y0, z0], [x1, y0, z0], [x1, y1, z1], [x0, y1, z1]], (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+        this.fillPoly([[x0, y0, z0 - 2.4], [x1, y0, z0 - 2.4], [x1, y0, z0], [x0, y0, z0]], concrete);
+        if (z0 > 3) this.fillPoly([[x0, y0 - 0.2, 0], [x1, y0 - 0.2, 0], [x1, y0, z0 - 2.4], [x0, y0, z0 - 2.4]], shade(concrete, -0.25));
+        if (x0 > -9) this.fillPoly([[x0, y0, 0], [x0, y1, 0], [x0, y1, z1], [x0, y0, z0]], shade(concrete, -0.15));
+        if (x1 < L + 9) this.fillPoly([[x1, y0, 0], [x1, y1, 0], [x1, y1, z1], [x1, y0, z0]], shade(concrete, -0.15));
+      }
+      if (cfg.banner) this.drawBanner(cfg);
+      if (cfg.screen) this.drawScreen(cfg);
+      // bakom målen
+      for (const [sg, ya, yb, d0, d1, z0, z1] of cfg.ends.slice().sort((a, b) => b[3] - a[3])) {
+        const xa = sg < 0 ? -d0 : L + d0, xb = sg < 0 ? -d1 : L + d1;
+        this.fillPoly([[xb, ya, z1], [xb, yb, z1], [xb + sg * 1.5, yb, z1 + 2.5], [xb + sg * 1.5, ya, z1 + 2.5]], top);
+        crowdFill([[xa, ya, z0], [xa, yb, z0], [xb, yb, z1], [xb, ya, z1]], (xa + xb) / 2, (ya + yb) / 2, (z0 + z1) / 2);
+        this.fillPoly([[xa, ya, z0 - 2.4], [xa, yb, z0 - 2.4], [xa, yb, z0], [xa, ya, z0]], concrete);
+        if (z0 > 3) this.fillPoly([[xa, ya, 0], [xa, yb, 0], [xa, yb, z0 - 2.4], [xa, ya, z0 - 2.4]], shade(concrete, -0.25));
+        this.fillPoly([[xa, ya, 0], [xb, ya, 0], [xb, ya, z1], [xa, ya, z0]], shade(concrete, -0.15));
+        this.fillPoly([[xa, yb, 0], [xb, yb, 0], [xb, yb, z1], [xa, yb, z0]], shade(concrete, -0.15));
+      }
+      if (cfg.roof) this.drawRoofs(cfg);
+      if (cfg.flags) this.drawFlags(cfg);
+      // närmsta långsidan (syns på hemskärmen; i matchen sitter kameran ovanför den)
+      for (const [x0, x1, d0, d1, z0, z1] of cfg.near.slice().sort((a, b) => b[2] - a[2])) {
+        const y0 = -d0, y1 = -d1;
+        crowdFill([[x0, y0, z0], [x1, y0, z0], [x1, y1, z1], [x0, y1, z1]], (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+        this.fillPoly([[x0, y0, z0 - 2.4], [x1, y0, z0 - 2.4], [x1, y0, z0], [x0, y0, z0]], concrete);
+      }
+      if (cfg.masts && hub) this.drawMasts(hub, true);
+    }
+
+    // Träd runt den lilla planen (nivå 1): stam och krona, de bortersta ritas först
+    drawTrees() {
+      if (!this.trees) {
+        let seed = 5;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        const t = [];
+        for (let x = -45; x <= 150; x += 6 + rnd() * 3) t.push([x, W + 18 + rnd() * 16, 3 + rnd() * 2]);
+        for (const sg of [-1, 1]) for (let y = -25; y <= W + 25; y += 6 + rnd() * 3) t.push([sg < 0 ? -18 - rnd() * 18 : L + 18 + rnd() * 18, y, 3 + rnd() * 2]);
+        this.trees = t;
+      }
+      const ctx = this.ctx;
+      const list = this.trees.map(([x, y, r]) => ({ x, y, r, d: this.toCam(x, y, 4)[2] })).filter(t => t.d > NEAR).sort((a, b) => b.d - a.d);
+      for (const t of list) {
+        const base = this.proj(t.x, t.y, 0), crown = this.proj(t.x, t.y, 3 + t.r);
+        if (!base || !crown) continue;
+        ctx.strokeStyle = '#4a3423'; ctx.lineWidth = Math.max(1, 0.5 * base.s);
+        ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(crown.x, crown.y); ctx.stroke();
+        const rad = t.r * crown.s;
+        ctx.fillStyle = '#1f4a28';
+        ctx.beginPath(); ctx.arc(crown.x, crown.y, rad, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(120,170,90,0.35)';
+        ctx.beginPath(); ctx.arc(crown.x - rad * 0.25, crown.y - rad * 0.3, rad * 0.55, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    drawMasts(hub, nearOnly) {
+      const ctx = this.ctx;
+      const spots = nearOnly ? [[-16, -16], [L + 16, -16]] : [[-16, W + 16], [L + 16, W + 16]];
+      for (const [x, y] of spots) {
+        const a = this.proj(x, y, 0), b = this.proj(x, y, 44);
+        if (!a || !b) continue;
+        ctx.strokeStyle = '#3a4152'; ctx.lineWidth = Math.max(2, 0.8 * b.s);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const dx = (L / 2 - x), dy = (CY - y), dl = Math.hypot(dx, dy), nx = -dy / dl * 4, ny = dx / dl * 4;
+        this.fillPoly([[x - nx, y - ny, 42], [x + nx, y + ny, 42], [x + nx, y + ny, 47], [x - nx, y - ny, 47]], '#e9f1ff');
+        const gl = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, Math.max(30, b.s * 18));
+        gl.addColorStop(0, 'rgba(255,250,225,0.55)'); gl.addColorStop(1, 'rgba(255,250,225,0)');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl;
+        ctx.fillRect(b.x - b.s * 18, b.y - b.s * 18, b.s * 36, b.s * 36); ctx.restore();
+      }
+    }
+
+    drawRoofs(cfg) {
+      const ctx = this.ctx, roof = '#151b29', edge = cfg.ring ? '#fff7d1' : '#3d475c';
+      for (const [x0, x1, d0, d1, , z1] of cfg.far.filter(t => t === cfg.far.reduce((m, q) => (q[3] > m[3] ? q : m)))) {
+        const yb = W + d1 + 2, yf = W + d0 + (d1 - d0) * 0.45, z = z1 + 6;
+        this.fillPoly([[x0, yb, z], [x1, yb, z], [x1, yf, z - 1], [x0, yf, z - 1]], roof);
+        ctx.beginPath(); this.line3([x0, yf, z - 1], [x1, yf, z - 1]);
+        ctx.strokeStyle = edge; ctx.lineWidth = Math.max(1.5, this.dpr * (cfg.ring ? 3 : 1.5)); ctx.stroke();
+      }
+      if (!cfg.roofEnds) return;
+      for (const [sg, ya, yb, d0, d1, , z1] of cfg.ends.filter(t => t[3] === Math.max(...cfg.ends.map(q => q[3])))) {
+        const xb = sg < 0 ? -d1 - 2 : L + d1 + 2, xf = sg < 0 ? -d0 - (d1 - d0) * 0.45 : L + d0 + (d1 - d0) * 0.45, z = z1 + 6;
+        this.fillPoly([[xb, ya, z], [xb, yb, z], [xf, yb, z - 1], [xf, ya, z - 1]], roof);
+        ctx.beginPath(); this.line3([xf, ya, z - 1], [xf, yb, z - 1]);
+        ctx.strokeStyle = edge; ctx.lineWidth = Math.max(1.5, this.dpr * (cfg.ring ? 3 : 1.5)); ctx.stroke();
+      }
+    }
+
+    // Klubbens namn på läktarkanten mellan våningarna
+    drawBanner(cfg) {
+      const st = this.stadium, upper = cfg.far.reduce((m, q) => (q[2] > m[2] ? q : m));
+      const [x0, x1, d0, , z0] = upper, y = W + d0;
+      const kitCol = st.seat;
+      this.fillPoly([[x0, y - 0.1, z0 - 2.6], [x1, y - 0.1, z0 - 2.6], [x1, y - 0.1, z0 - 0.2], [x0, y - 0.1, z0 - 0.2]], kitCol);
+      if (Math.abs(this.c.rx) < 0.85 || !st.club) return;
+      const ctx = this.ctx;
+      for (let x = x0 + 12; x < x1 - 6; x += 32) {
+        const p = this.proj(x, y - 0.2, z0 - 1.4);
+        if (!p) continue;
+        ctx.font = `800 ${Math.round(p.s * 1.7)}px "Saira Condensed", "Arial Narrow", sans-serif`;
+        ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(st.club.toUpperCase(), p.x, p.y);
+      }
+    }
+
+    // Stor skärm ovanför bortre läktaren
+    drawScreen(cfg) {
+      const st = this.stadium, upper = cfg.far.reduce((m, q) => (q[3] > m[3] ? q : m));
+      const y = W + upper[3] - 3, z0 = upper[5] + 3, z1 = z0 + 9, x0 = L / 2 - 10, x1 = L / 2 + 10;
+      this.fillPoly([[x0 - 1, y, z0 - 1], [x1 + 1, y, z0 - 1], [x1 + 1, y, z1 + 1], [x0 - 1, y, z1 + 1]], '#0a0d14');
+      this.fillPoly([[x0, y - 0.1, z0], [x1, y - 0.1, z0], [x1, y - 0.1, z1], [x0, y - 0.1, z1]], shade(st.seat, -0.45));
+      const p = this.proj(L / 2, y - 0.2, (z0 + z1) / 2);
+      if (!p || Math.abs(this.c.rx) < 0.85) return;
+      const ctx = this.ctx;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
+      ctx.font = `800 ${Math.round(p.s * 2.6)}px "Saira Condensed", "Arial Narrow", sans-serif`;
+      ctx.fillText((st.club || 'MATCHDAG').toUpperCase(), p.x, p.y - p.s * 1.6);
+      ctx.fillStyle = '#ffd23f';
+      ctx.font = `700 ${Math.round(p.s * 1.8)}px "Saira Condensed", "Arial Narrow", sans-serif`;
+      ctx.fillText(FB.stadium(st.level).name.toUpperCase(), p.x, p.y + p.s * 1.9);
+    }
+
+    // Flaggor i klubbens färger längs taket
+    drawFlags(cfg) {
+      const ctx = this.ctx, st = this.stadium, upper = cfg.far.reduce((m, q) => (q[3] > m[3] ? q : m));
+      const y = W + upper[3] + 2, z = upper[5] + 6;
+      for (let x = upper[0] + 6, i = 0; x < upper[1] - 4; x += 9, i++) {
+        const a = this.proj(x, y, z), b = this.proj(x, y, z + 6);
+        if (!a || !b) continue;
+        ctx.strokeStyle = '#c9ced8'; ctx.lineWidth = Math.max(1, this.dpr);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const w = b.s * 3.2, wave = Math.sin(this.time * 3 + i) * b.s * 0.4;
+        ctx.fillStyle = i % 2 ? st.seat : '#f4f4f0';
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + w, b.y + b.s * 0.8 + wave); ctx.lineTo(b.x, b.y + b.s * 1.8); ctx.closePath(); ctx.fill();
+      }
     }
 
     drawPitch() {
@@ -260,6 +466,10 @@
 
     drawBoards() {
       const ctx = this.ctx;
+      if (this.stadium && this.stadium.level === 1) {
+        for (let x = -6; x < L + 6; x += 2.2) this.fillPoly([[x, W + 4.5, 0], [x + 2, W + 4.5, 0], [x + 2, W + 4.5, 1.1], [x, W + 4.5, 1.1]], x % 4.4 < 2.2 ? '#7a5434' : '#6a472b');
+        return;
+      }
       const side = Math.abs(this.c.rx) > 0.9;
       const n = 12, bw = (L + 10) / n;
       for (let i = 0; i < n; i++) {
@@ -622,10 +832,11 @@
     draw(scene, dt) {
       this.time += dt;
       this.flip = !!scene.flip;
+      if (scene.stadium) this.setStadium(scene.stadium.level, scene.stadium.seat, scene.stadium.club);
       this.updateCamera(scene, dt);
       const ctx = this.ctx;
       this.screen.clear();
-      this.drawBackground();
+      this.drawBackground(scene);
       this.drawPitch();
       // skuggor
       for (const p of scene.all) {

@@ -267,6 +267,7 @@
     return {
       name: u.club, short: FB.shortName(u.club), kit: FB.kit(u.kits && u.kits.active), gkKit: FB.GK_KITS[0],
       formation: u.formation, squad: u.squad, lineup: u.lineup, energyDrinks: (u.items && u.items.energidryck) || 0,
+      stadium: u.stadium || 1,
     };
   };
 
@@ -284,6 +285,42 @@
       if (colorDist(t.gkKit.shirt, other.kit.shirt) < 90 || colorDist(t.gkKit.shirt, t.kit.shirt) < 90) t.gkKit = { shirt: '#ec4899', shorts: '#1f1f1f', socks: '#ec4899', num: '#1f1f1f' };
     }
   };
+
+  // ---------------------------------------------------------------- lyckohjulet
+  // Ordningen runt hjulet: de vanliga små vinsterna ligger bredvid de stora,
+  // och hjulet stannar ofta nära kanten mot en stor vinst. weight = hur ofta (av 1000).
+  // tier: 0 vanlig, 1 ovanlig, 2 sällsynt, 3 supersällsynt
+  FB.WHEEL = [
+    { id: 'c10', label: '10', sub: 'mynt', coins: 10, weight: 250, tier: 0 },
+    { id: 'jackpot', label: 'JACKPOT', sub: '5 000 + 20', coins: 5000, diamonds: 20, weight: 10, tier: 3 },
+    { id: 'c50', label: '50', sub: 'mynt', coins: 50, weight: 220, tier: 0 },
+    { id: 'boost', label: '×3', sub: 'nästa match', boost: 3, weight: 50, tier: 2 },
+    { id: 'd1', label: '1', sub: 'diamant', diamonds: 1, weight: 150, tier: 0 },
+    { id: 'd5', label: '5', sub: 'diamanter', diamonds: 5, weight: 30, tier: 2 },
+    { id: 'c100', label: '100', sub: 'mynt', coins: 100, weight: 140, tier: 1 },
+    { id: 'c200', label: '200', sub: 'mynt', coins: 200, weight: 70, tier: 1 },
+    { id: 'spin', label: 'SNURRA', sub: 'igen', extraSpin: 1, weight: 80, tier: 1 },
+  ];
+  FB.WHEEL_TIERS = ['Vanlig', 'Ovanlig', 'Sällsynt', 'Supersällsynt'];
+  FB.wheelPrizeText = function (p) {
+    if (p.id === 'jackpot') return 'JACKPOT! 5 000 spelpengar och 20 diamanter!';
+    if (p.boost) return `Nästa match ger ×${p.boost} så mycket spelpengar!`;
+    if (p.extraSpin) return 'Du får snurra en gång till!';
+    if (p.diamonds) return `${p.diamonds} ${p.diamonds === 1 ? 'diamant' : 'diamanter'}!`;
+    return `${FB.formatCoins(p.coins)} spelpengar!`;
+  };
+
+  // ---------------------------------------------------------------- arenan
+  // Byggs ut med diamanter. income = biljettintäkter för varje match mot datorn.
+  FB.STADIUMS = [
+    { level: 1, name: 'Lokalplanen', cost: 0, capacity: 400, income: 0, desc: 'En liten träläktare, ett staket och träd runt planen.' },
+    { level: 2, name: 'Idrottsplatsen', cost: 5, capacity: 4000, income: 25, desc: 'Läktare längs hela långsidan och bakom målen.' },
+    { level: 3, name: 'Arenan', cost: 10, capacity: 15000, income: 60, desc: 'Högre läktare, tak och strålkastare i hörnen.' },
+    { level: 4, name: 'Storarenan', cost: 20, capacity: 32000, income: 100, desc: 'Två våningar, stor resultattavla och klubbens namn på läktaren.' },
+    { level: 5, name: 'Nationalarenan', cost: 40, capacity: 60000, income: 150, desc: 'En sluten skål med tak runt om och en ljusslinga.' },
+  ];
+  FB.stadium = level => FB.STADIUMS[Math.max(1, Math.min(FB.STADIUMS.length, level | 0)) - 1];
+  FB.START_DIAMONDS = 5;
 
   FB.START_COINS = 1500;
   FB.SCOUT_COST = 150;

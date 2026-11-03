@@ -200,6 +200,7 @@
         all: this.all, teams: this.teams.length ? this.teams : [{ kit: FB.KITS[0], gkKit: FB.GK_KITS[0] }, { kit: FB.AWAY_KIT, gkKit: FB.GK_KITS[1] }],
         ball: this.ball, cam: s ? s.cam : { mode: 'side' }, flip: true, markers, netPulse: s ? s.np : null, time: s ? s.t : 0,
         ballOwned: this.ownerIdx >= 0, celebrate,
+        stadium: this.roster ? { level: this.roster[0].stadium || 3, seat: this.roster[0].kit.shirt, club: this.roster[0].name } : null,
       };
     }
 

@@ -97,6 +97,45 @@
     }
   };
 
+  // Lag som skapades innan diamanter, arena och lyckohjul fanns får standardvärden
+  G.normalize = function (u) {
+    if (typeof u.diamonds !== 'number' || !isFinite(u.diamonds)) u.diamonds = FB.START_DIAMONDS;
+    if (!u.stadium) u.stadium = 1;
+    u.stadium = FB.stadium(u.stadium).level;
+    if (!u.wheel || typeof u.wheel !== 'object') u.wheel = { next: 0, extra: 0 };
+    u.wheel.next = +u.wheel.next || 0;
+    u.wheel.extra = Math.max(0, u.wheel.extra | 0);
+    if (u.boost && !(u.boost.mult > 1)) u.boost = null;
+    G.fixLineup(u);
+    return u;
+  };
+
+  // ------------------------------------------------------------ lyckohjulet
+  // Nästa gratis snurr: vid midnatt (lokal tid där spelet räknas – servern eller webbläsaren)
+  G.nextMidnight = function (now) {
+    const d = new Date(now);
+    d.setHours(24, 0, 0, 0);
+    return d.getTime();
+  };
+  G.wheelReady = (u, now) => !!u.wheel && (u.wheel.extra > 0 || now >= u.wheel.next);
+
+  // Välj vinst efter vikterna. offset = var i tårtbiten pilen stannar (0 = början, 1 = slutet).
+  // En vanlig vinst bredvid en bättre stannar nära kanten mot den bättre – "nära ögat".
+  G.pickWheel = function (random) {
+    const total = FB.WHEEL.reduce((a, p) => a + p.weight, 0);
+    let r = random() * total, index = 0;
+    for (; index < FB.WHEEL.length - 1; index++) { r -= FB.WHEEL[index].weight; if (r < 0) break; }
+    const n = FB.WHEEL.length, me = FB.WHEEL[index];
+    const before = FB.WHEEL[(index + n - 1) % n], after = FB.WHEEL[(index + 1) % n];
+    let offset;
+    if (Math.max(before.tier, after.tier) > me.tier) {
+      const edge = 0.04 + random() * 0.16;
+      if (after.tier > before.tier || (after.tier === before.tier && random() < 0.5)) offset = 1 - edge;
+      else offset = edge;
+    } else offset = 0.25 + random() * 0.5;
+    return { index, offset };
+  };
+
   G.inbox = function (u, text) {
     u.inbox = u.inbox || [];
     u.inbox.unshift({ t: Date.now(), text });
@@ -125,7 +164,8 @@
     const rng = FB.rng(FB.hash(name + Date.now()));
     const squad = FB.makeSquad(rng, 54, 'tmp').map(p => Object.assign(p, { uid: uid() }));
     const u = {
-      name, club, coins: FB.START_COINS, squad, formation: '4-3-3', lineup: [],
+      name, club, coins: FB.START_COINS, diamonds: FB.START_DIAMONDS, squad, formation: '4-3-3', lineup: [],
+      stadium: 1, wheel: { next: 0, extra: 0 }, boost: null,
       items: { energidryck: 1, medicin: 0, kikare: 0, proffsskor: 0 }, kits: { owned: ['klubb'], active: 'klubb' },
       stats: { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, trophies: 0 }, tournament: null, scouted: null,
       inbox: [{ t: Date.now(), text: `Välkommen till ${club}! Du har fått ${FB.START_COINS} spelpengar, en trupp på 16 spelare och en energidryck.` }],
@@ -222,9 +262,13 @@
   // Kompismatch: insatsen är redan betald. Vinnaren får potten (båda insatserna) plus bonus.
   G.settleFriend = function (u, o) {
     const mine = o.mine | 0, theirs = o.theirs | 0, wager = Math.max(0, o.wager | 0), wo = o.walkover ? ' (walkover)' : '';
+    // ×3 från lyckohjulet gäller nästa match, vinst eller inte. Det är bonusen som blir tre gånger så stor.
+    const mult = u.boost && u.boost.mult > 1 ? u.boost.mult : 1;
+    u.boost = null;
     if (mine > theirs) {
-      u.coins += wager * 2 + FB.FRIEND_WIN_REWARD;
-      G.inbox(u, `Du vann mot ${o.opponent} med ${mine}–${theirs}${wo} och fick ${FB.formatCoins(wager * 2 + FB.FRIEND_WIN_REWARD)} spelpengar.`);
+      const won = wager * 2 + FB.FRIEND_WIN_REWARD * mult;
+      u.coins += won;
+      G.inbox(u, `Du vann mot ${o.opponent} med ${mine}–${theirs}${wo} och fick ${FB.formatCoins(won)} spelpengar${mult > 1 ? ` (×${mult} från lyckohjulet)` : ''}.`);
     } else if (mine === theirs) {
       u.coins += wager;
       G.inbox(u, `Oavgjort ${mine}–${theirs} mot ${o.opponent}. Insatsen betalades tillbaka.`);
@@ -376,9 +420,41 @@
           G.advanceTournament(u, won, `${gf}–${ga}${gf === ga ? ' (str)' : ''}`);
           tournament = u.tournament;
         }
+        // biljettintäkter från arenan, sedan ×3 från lyckohjulet på allt matchen ger
+        const ticket = FB.stadium(u.stadium).income;
+        reward += ticket;
+        const boost = u.boost && u.boost.mult > 1 ? u.boost.mult : 1;
+        u.boost = null;
+        reward *= boost;
         u.coins += reward;
         const after = G.applyMatchAftermath(u, b.injuries, b.drinks);
-        return { reward, outcome, tournament, healed: after.healed, hurt: after.hurt };
+        return { reward, ticket, boost, outcome, tournament, healed: after.healed, hurt: after.hurt };
+      },
+      'POST /api/wheel/spin': (b, u) => {
+        const now = Date.now(), w = u.wheel;
+        if (now >= w.next) w.next = G.nextMidnight(now);      // dagens gratis snurr
+        else if (w.extra > 0) w.extra--;                       // en extra snurr från hjulet
+        else {
+          const min = Math.ceil((w.next - now) / 60000);
+          fail(`Du har redan snurrat idag. Nästa snurr om ${min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`}.`);
+        }
+        const { index, offset } = G.pickWheel(ctx.random);
+        const p = FB.WHEEL[index];
+        if (p.coins) u.coins += p.coins;
+        if (p.diamonds) u.diamonds += p.diamonds;
+        if (p.extraSpin) w.extra += p.extraSpin;
+        if (p.boost) u.boost = { mult: p.boost };
+        if (p.tier >= 2) G.inbox(u, `Lyckohjulet: ${FB.wheelPrizeText(p)}`);
+        return { index, offset, prize: p.id };
+      },
+      'POST /api/stadium/upgrade': (b, u) => {
+        const next = FB.STADIUMS[u.stadium];
+        if (!next) fail('Arenan är redan fullt utbyggd.');
+        if (u.diamonds < next.cost) fail(`Det kostar ${next.cost} diamanter att bygga ut till ${next.name}. Du har ${u.diamonds}.`);
+        u.diamonds -= next.cost;
+        u.stadium = next.level;
+        G.inbox(u, `Arenan är utbyggd till ${next.name}! Nu får du ${next.income} spelpengar i biljettintäkter varje match mot datorn.`);
+        return { level: next.level };
       },
       'POST /api/tournament/start': (b, u) => {
         const fee = b.fee | 0;

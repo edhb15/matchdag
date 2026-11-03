@@ -135,7 +135,7 @@ const api = {
     const token = crypto.randomBytes(24).toString('hex');
     db.sessions[token] = keyOf(name);
     save();
-    return { token, profile: publicUser(u) };
+    return { token, profile: publicUser(G.normalize(u)) };
   },
   'POST /api/login': (req, b) => {
     // efter 5 fel PIN-koder i rad låses kontot i 10 minuter, så att ingen kan prova alla koder
@@ -152,7 +152,7 @@ const api = {
     const token = crypto.randomBytes(24).toString('hex');
     db.sessions[token] = keyOf(u.name);
     save();
-    return { token, profile: publicUser(u) };
+    return { token, profile: publicUser(G.normalize(u)) };
   },
   'POST /api/logout': (req, b, u, token) => { delete db.sessions[token]; save(); return { ok: true }; },
   'GET /api/profile': (req, b, u) => ({ profile: publicUser(u) }),
@@ -324,7 +324,7 @@ const server = http.createServer(async (req, res) => {
     const token = req.headers['x-token'] || '';
     const u = userByToken(token);
     if (!u && !PUBLIC_ROUTES.has(key)) throw new G.GameError('Logga in igen.', 401);
-    if (u) fixLineup(u);
+    if (u) G.normalize(u);
     const out = await fn(req, body, u, token);
     sendJson(res, 200, out);
   } catch (e) {
@@ -481,7 +481,7 @@ server.on('upgrade', (req, socket) => {
       H.coins -= room.wager; u.coins -= room.wager;
       room.guest = conn; room.guestUser = conn.user; room.state = 'playing';
       conn.room = room;
-      fixLineup(H); fixLineup(u);
+      G.normalize(H); G.normalize(u);
       save();
       room.host.send({ t: 'start', role: 'host', code, wager: room.wager, opponent: u.club, guestTeam: FB.teamFromProfile(u), coins: H.coins });
       conn.send({ t: 'start', role: 'guest', code, wager: room.wager, opponent: H.club, coins: u.coins });

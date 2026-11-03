@@ -95,6 +95,28 @@
       }
     }
 
+    // klick när lyckohjulet passerar en ny tårtbit
+    tick() {
+      if (!this.ctx) return;
+      const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = 1900;
+      g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.04);
+    }
+
+    // vinstljud: fler toner ju bättre vinst
+    win(tier) {
+      if (!this.ctx) return;
+      const ctx = this.ctx, notes = [523, 659, 784, 1047, 1319].slice(0, 2 + Math.min(3, tier | 0));
+      notes.forEach((f, i) => {
+        const t = ctx.currentTime + i * 0.11, o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.4);
+      });
+      if (tier >= 3) this.cheer(1);
+    }
+
     post() {
       if (!this.ctx) return;
       const ctx = this.ctx, t = ctx.currentTime;

@@ -74,6 +74,7 @@
     finally { S.busy = false; }
   }
 
+  const gems = n => `<span class="gems"><i class="gem" aria-hidden="true"></i>${FB.formatCoins(n || 0)}</span>`;
   const coins = n => `<span class="coins"><i class="coin" aria-hidden="true"></i>${FB.formatCoins(n)}</span>`;
   const kitChip = k => `<span class="kitchip" style="background:${esc(k.shirt)};border-color:${esc(k.shorts)}"></span>`;
   const squadById = () => new Map(S.profile.squad.map(p => [p.uid, p]));
@@ -160,24 +161,138 @@
     doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v4h4 M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
     gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    wheel: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4.5v17M3.5 13h17M6 7l12 12M18 7L6 19" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 1.5h5L12 5z" fill="currentColor"/></svg>',
+    arena: '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="14" rx="9.5" ry="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><ellipse cx="12" cy="14" rx="5" ry="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 14V9.5c0-3 4.3-5 9.5-5s9.5 2 9.5 5V14" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
   };
 
   function render() {
     if (game) return;
     clearInterval(marketTimer); marketTimer = null;
     if (!S.token || !S.profile) { app.innerHTML = renderLogin(); return; }
-    const titles = { hem: '', spela: 'Snabbmatch', turnering: 'Turnering', kompis: 'Spela mot kompis', lag: 'Mitt lag', affar: 'Affär', marknad: 'Global marknad', dokument: 'Spelardokument', installningar: 'Inställningar', resultat: 'Resultat' };
-    const fn = { hem: renderHub, spela: renderPlay, turnering: renderTournament, kompis: renderFriends, lag: renderTeam, affar: renderShop, marknad: renderMarket, dokument: renderDoc, installningar: renderSettings, resultat: renderResult }[S.screen] || renderHub;
+    const titles = { hem: '', hjul: 'Lyckohjul', arena: 'Arena', spela: 'Snabbmatch', turnering: 'Turnering', kompis: 'Spela mot kompis', lag: 'Mitt lag', affar: 'Affär', marknad: 'Global marknad', dokument: 'Spelardokument', installningar: 'Inställningar', resultat: 'Resultat' };
+    const fn = { hem: renderHub, hjul: renderWheel, arena: renderArena, spela: renderPlay, turnering: renderTournament, kompis: renderFriends, lag: renderTeam, affar: renderShop, marknad: renderMarket, dokument: renderDoc, installningar: renderSettings, resultat: renderResult }[S.screen] || renderHub;
     const p = S.profile;
     app.innerHTML = `
       <header class="topbar">
         ${S.screen !== 'hem' ? `<button type="button" class="iconbtn" data-go="hem" aria-label="Tillbaka till start">${ICONS.back}</button>` : `<span class="brand">${ICONS.ball}<b>Matchdag</b></span>`}
         <h1>${S.screen === 'hem' ? esc(p.club) : esc(titles[S.screen] || '')}</h1>
-        <span class="wallet" title="Spelpengar">${coins(p.coins)}</span>
+        <span class="wallet"><span title="Spelpengar">${coins(p.coins)}</span><span title="Diamanter">${gems(p.diamonds)}</span></span>
       </header>
       <main class="screen screen-${S.screen}">${fn()}</main>`;
     if (S.screen === 'marknad') marketTimer = setInterval(() => { if (S.screen === 'marknad' && !game) tickMarket(); }, 1000);
+    if (S.screen === 'hem' || S.screen === 'hjul') marketTimer = setInterval(tickCountdowns, 1000);
+    stage.sync();
   }
+
+  // Nedräkning till nästa gratissnurr
+  function tickCountdowns() {
+    if (game) return;
+    for (const el of app.querySelectorAll('[data-until]')) {
+      const ms = +el.dataset.until - Date.now();
+      if (ms <= 0 && !S.spinning) { render(); return; }
+      el.textContent = untilText(ms);
+    }
+  }
+  const untilText = ms => {
+    const m = Math.max(1, Math.ceil(ms / 60000));
+    return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+  };
+  function wheelInfo(p) {
+    const w = p.wheel || { next: 0, extra: 0 }, daily = Date.now() >= (w.next || 0);
+    return { ready: daily || w.extra > 0, daily, extra: w.extra || 0, until: w.next || 0 };
+  }
+
+  // ------------------------------------------------------------------ arenan i bakgrunden
+  // Startsidan, lyckohjulet och arenasidan visar ditt lags arena med laget som värmer upp.
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const stage = {
+    cv: document.getElementById('stadium-bg'), r: null, raf: 0, on: false, key: '', players: [], last: 0,
+    want() { return !game && !!S.token && !!S.profile && ['hem', 'hjul', 'arena'].includes(S.screen); },
+    sync() { if (this.want()) { this.start(); this.measure(); } else this.stop(); },
+    // var på skärmen arenan syns: luckan mellan korten och knapparna på startsidan, annars under toppraden
+    measure() {
+      // mät som om sidan inte är scrollad (duken ligger still bakom sidan)
+      const vh = window.innerHeight || 1, q = s => app.querySelector(s), y = (el, k) => el.getBoundingClientRect()[k] + window.scrollY;
+      const gap = q('.hub-spacer'), bar = q('.topbar');
+      let band = [bar ? y(bar, 'bottom') / vh : 0.08, 1];
+      if (gap) {
+        const top = q('.hub-top'), dock = q('.hub-dock');
+        const a = y(top || gap, top ? 'bottom' : 'top') / vh, b = y(dock || gap, dock ? 'top' : 'bottom') / vh;
+        // för liten lucka (liggande mobil): låt arenan ta plats bakom knapparna också
+        band = b - a > 0.22 ? [a, b] : [Math.max(0, a - 0.1), Math.min(1, b + 0.25)];
+      }
+      this.band = band;
+    },
+    start() {
+      if (!this.cv) return;
+      document.body.classList.add('stage');
+      this.cv.hidden = false;
+      if (!this.r) this.r = new FB.Renderer(this.cv);
+      const p = S.profile, key = [p.club, p.kits.active, p.formation, p.lineup.join()].join('|');
+      if (key !== this.key) { this.key = key; this.build(p); }
+      if (this.on) return;
+      this.on = true;
+      this.r.resize();
+      this.last = performance.now();
+      this.frame(0.016);
+      const loop = now => {
+        if (!this.on) return;
+        this.raf = requestAnimationFrame(loop);
+        const dt = (now - this.last) / 1000;
+        if (dt < (reducedMotion ? 1 : 1 / 30)) return;
+        this.last = now;
+        this.frame(Math.min(dt, 0.1));
+      };
+      this.raf = requestAnimationFrame(loop);
+    },
+    stop() {
+      this.on = false;
+      cancelAnimationFrame(this.raf);
+      if (this.cv) this.cv.hidden = true;
+      document.body.classList.remove('stage');
+    },
+    build(p) {
+      const byId = squadById(), F = FB.FORMATIONS[p.formation] || FB.FORMATIONS['4-3-3'];
+      this.players = p.lineup.map((uid, slot) => {
+        const q = byId.get(uid) || {}, h = FB.hash(uid);
+        const [d, w] = F.pos[slot];
+        const hx = slot === 0 ? 4 : 10 + d * 34, hy = E.CY + (w - 0.5) * E.W * 0.7;
+        return {
+          uid, name: q.name, num: q.num || slot + 1, slot, side: 0, pos: q.pos, hx, hy, x: hx, y: hy, tx: hx, ty: hy, vx: 0, vy: 0,
+          face: 0, state: 'run', anim: (h % 628) / 100, frozen: 0, wait: (h % 30) / 10,
+          skin: E.SKINS[h % E.SKINS.length], hair: E.HAIRS[(h >> 3) % E.HAIRS.length],
+        };
+      });
+      this.ball = { x: E.L / 2, y: E.CY, z: 0, vx: 0, vy: 0, vz: 0, roll: 0 };
+    },
+    frame(dt) {
+      const p = S.profile;
+      for (const q of this.players) {
+        const dx = q.tx - q.x, dy = q.ty - q.y, d = Math.hypot(dx, dy);
+        if (q.wait > 0) { q.wait -= dt; q.vx *= 0.85; q.vy *= 0.85; }
+        else if (d < 0.6) {
+          const r = q.slot === 0 ? 2 : 7;
+          q.tx = q.hx + (Math.random() - 0.5) * 2 * r; q.ty = q.hy + (Math.random() - 0.5) * 2 * r;
+          q.wait = Math.random() * 2.5;
+        } else {
+          const sp = q.slot === 0 ? 1.4 : 2.8, k = Math.min(1, dt * 3);
+          q.vx += ((dx / d) * sp - q.vx) * k; q.vy += ((dy / d) * sp - q.vy) * k;
+        }
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        const s = Math.hypot(q.vx, q.vy);
+        q.face = s > 0.3 ? Math.atan2(q.vy, q.vx) : Math.atan2(this.ball.y - q.y, this.ball.x - q.x);
+        q.anim += s * dt * 1.7;
+      }
+      const kit = FB.kit(p.kits.active);
+      this.r.draw({
+        all: this.players, teams: [{ kit, gkKit: FB.GK_KITS[0] }, { kit: FB.AWAY_KIT, gkKit: FB.GK_KITS[1] }], ball: this.ball,
+        cam: { mode: 'hub', band: this.band }, flip: false, markers: [], netPulse: null, time: this.r.time, ballOwned: false,
+        stadium: { level: p.stadium || 1, seat: kit.shirt, club: p.club },
+      }, dt);
+    },
+  };
+  window.addEventListener('resize', () => { if (stage.r && stage.on) { stage.r.resize(); stage.measure(); } });
 
   // ------------------------------------------------------------------ inloggning
   function loginHero() {
@@ -238,42 +353,189 @@
   function renderHub() {
     const p = S.profile, st = p.stats, t = p.tournament;
     const injured = p.squad.filter(q => q.injury).length;
-    const lb = S.leaderboard || [];
+    const arena = FB.stadium(p.stadium), next = FB.STADIUMS[arena.level];
+    const wi = wheelInfo(p), inboxN = (p.inbox || []).length;
     const tStatus = t && t.status === 'active' ? `${FB.TOURNAMENT_ROUNDS[t.round]} väntar · pott ${FB.formatCoins(t.pot)}` : 'Lägg in pengar – vinnaren tar hela potten';
     return `
-      <section class="club-strip">
-        ${kitChip(FB.kit(p.kits.active))}
-        <div><b class="big-num">${teamOvr()}</b><span class="label">Lagbetyg</span></div>
-        <div><b class="big-num">${st.won}–${st.drawn}–${st.lost}</b><span class="label">V–O–F</span></div>
-        <div><b class="big-num">${st.trophies}</b><span class="label">Troféer</span></div>
-        <div><b class="big-num">${p.squad.length}</b><span class="label">Spelare${injured ? ` · <span class="warn">${injured} skadade</span>` : ''}</span></div>
-      </section>
-      <section class="tiles main-tiles">
-        <button type="button" class="tile hero" data-go="spela">${ICONS.ball}<b>Snabbmatch</b><span>Spela mot datorn och vinn spelpengar</span></button>
-        <button type="button" class="tile hero" data-go="turnering">${ICONS.cup}<b>Turnering</b><span>${esc(tStatus)}</span></button>
-        <button type="button" class="tile hero" data-go="kompis">${ICONS.duo}<b>Spela mot kompis</b><span>Realtid över nätet, med insats</span></button>
-      </section>
-      <section class="tiles">
-        <button type="button" class="tile" data-go="lag">${ICONS.shirt}<b>Mitt lag</b><span>Se laget, träna, scouta och läka</span></button>
-        <button type="button" class="tile" data-go="affar">${ICONS.bag}<b>Affär</b><span>Köp spelare, saker och matchställ</span></button>
-        ${S.static ? `<button type="button" class="tile" data-go="kompis">${ICONS.globe}<b>Handla med kompis</b><span>Köp och sälj spelare direkt med en kompis</span></button>`
-          : `<button type="button" class="tile" data-go="marknad">${ICONS.globe}<b>Global marknad</b><span>Buda på andras spelare</span></button>`}
-        <button type="button" class="tile" data-go="dokument">${ICONS.doc}<b>Spelardokument</b><span>${canEditDoc() ? 'Redigera spelare och statistik' : 'Se alla spelare och deras statistik'}</span></button>
-        <button type="button" class="tile" data-go="installningar">${ICONS.gear}<b>Inställningar</b><span>Matchlängd, ljud, kontroller</span></button>
-      </section>
-      <section class="two-col">
-        <div class="panel">
-          <div class="panel-h"><h2>Meddelanden</h2>${p.inbox && p.inbox.length ? '<button type="button" class="linkbtn" data-a="clear-inbox">Rensa</button>' : ''}</div>
-          ${p.inbox && p.inbox.length ? `<ul class="inbox">${p.inbox.slice(0, 6).map(m => `<li><time>${new Date(m.t).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time>${esc(m.text)}</li>`).join('')}</ul>` : '<p class="muted">Inga nya meddelanden.</p>'}
+      <section class="hub">
+        <div class="hub-top">
+          <div class="hub-card">
+            <p class="eyebrow">${esc(arena.name)} · nivå ${arena.level}</p>
+            <h2 class="hub-club">${kitChip(FB.kit(p.kits.active))}${esc(p.club)}</h2>
+            <div class="hub-stats">
+              <span><b>${teamOvr()}</b> lagbetyg</span>
+              <span><b>${st.won}–${st.drawn}–${st.lost}</b> V–O–F</span>
+              <span><b>${st.trophies}</b> troféer</span>
+              ${injured ? `<span class="warn"><b>${injured}</b> skadade</span>` : ''}
+              ${p.boost ? `<span class="boost-chip">×${p.boost.mult} nästa match</span>` : ''}
+            </div>
+          </div>
+          <div class="hub-chips">
+            <button type="button" class="hub-chip ${wi.ready ? 'ready' : ''}" data-go="hjul">${ICONS.wheel}<b>Lyckohjul</b>
+              <span>${wi.ready ? 'Snurra nu!' : `Igen om <span data-until="${wi.until}">${untilText(wi.until - Date.now())}</span>`}</span></button>
+            <button type="button" class="hub-chip" data-go="arena">${ICONS.arena}<b>Arena</b><span>${next ? `Bygg ut · ${gems(next.cost)}` : 'Fullt utbyggd'}</span></button>
+            <button type="button" class="hub-chip" data-panel="inbox">${ICONS.mail}<b>Meddelanden</b><span>${inboxN ? `${inboxN} st` : 'Inga nya'}</span></button>
+            ${S.static ? '' : `<button type="button" class="hub-chip" data-panel="top">${ICONS.cup}<b>Topplista</b><span>Alla lag</span></button>`}
+          </div>
         </div>
-        ${S.static ? `<div class="panel">
-          <div class="panel-h"><h2>Sparat i den här webbläsaren</h2></div>
-          <p class="muted">Ditt lag finns bara i den här webbläsaren. Spara en kopia ibland – den kan också läsas in på en annan dator eller mobil.</p>
-          <div class="row"><button type="button" class="ghost" data-a="export">Spara en kopia</button><label class="ghost file-btn">Läs in kopia<input type="file" id="f-import" accept=".json,application/json" hidden></label></div>
-        </div>` : `<div class="panel">
-          <div class="panel-h"><h2>Topplista</h2></div>
-          ${lb.length ? `<ol class="leader">${lb.slice(0, 8).map((r, i) => `<li class="${r.club === p.club ? 'me' : ''}"><span class="rank">${i + 1}</span><b>${esc(r.club)}</b><span class="muted">${esc(r.name)}</span><span>${r.trophies} troféer · ${r.won} vinster</span></li>`).join('')}</ol>` : '<p class="muted">Ingen har spelat än.</p>'}
-        </div>`}
+        <div class="hub-spacer" aria-hidden="true"></div>
+        <nav class="hub-dock" aria-label="Meny">
+          <div class="dock-main">
+            <button type="button" class="tile hero" data-go="spela">${ICONS.ball}<b>Snabbmatch</b><span>Spela mot datorn och vinn spelpengar</span></button>
+            <button type="button" class="tile hero" data-go="turnering">${ICONS.cup}<b>Turnering</b><span>${esc(tStatus)}</span></button>
+            <button type="button" class="tile hero" data-go="kompis">${ICONS.duo}<b>Spela mot kompis</b><span>Realtid över nätet, med insats</span></button>
+          </div>
+          <div class="dock-sub">
+            <button type="button" class="tile" data-go="lag">${ICONS.shirt}<b>Mitt lag</b></button>
+            <button type="button" class="tile" data-go="affar">${ICONS.bag}<b>Affär</b></button>
+            ${S.static ? `<button type="button" class="tile" data-go="kompis">${ICONS.globe}<b>Handla</b></button>` : `<button type="button" class="tile" data-go="marknad">${ICONS.globe}<b>Marknad</b></button>`}
+            <button type="button" class="tile" data-go="dokument">${ICONS.doc}<b>Dokument</b></button>
+            <button type="button" class="tile" data-go="installningar">${ICONS.gear}<b>Inställningar</b></button>
+          </div>
+        </nav>
+      </section>
+      ${S.sel.hubPanel ? hubPanel() : ''}`;
+  }
+
+  // Meddelanden och topplista öppnas ovanpå arenan
+  function hubPanel() {
+    const p = S.profile, lb = S.leaderboard || [];
+    let body;
+    if (S.sel.hubPanel === 'top') {
+      body = `<div class="panel-h"><h2>Topplista</h2></div>
+        ${lb.length ? `<ol class="leader">${lb.slice(0, 10).map((r, i) => `<li class="${r.club === p.club ? 'me' : ''}"><span class="rank">${i + 1}</span><b>${esc(r.club)}</b><span class="muted">${esc(r.name)}</span><span>${r.trophies} troféer · ${r.won} vinster</span></li>`).join('')}</ol>` : '<p class="muted">Ingen har spelat än.</p>'}`;
+    } else {
+      body = `<div class="panel-h"><h2>Meddelanden</h2>${p.inbox && p.inbox.length ? '<button type="button" class="linkbtn" data-a="clear-inbox">Rensa</button>' : ''}</div>
+        ${p.inbox && p.inbox.length ? `<ul class="inbox">${p.inbox.slice(0, 12).map(m => `<li><time>${new Date(m.t).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time>${esc(m.text)}</li>`).join('')}</ul>` : '<p class="muted">Inga nya meddelanden.</p>'}`;
+    }
+    return `<div class="hub-panel" role="dialog" aria-modal="true" aria-label="${S.sel.hubPanel === 'top' ? 'Topplista' : 'Meddelanden'}">
+      <div class="panel">${body}<p><button type="button" class="ghost" data-a="close-panel">Stäng</button></p></div></div>`;
+  }
+
+  // ------------------------------------------------------------------ lyckohjulet
+  const prizeName = p => p.id === 'jackpot' ? 'Jackpot: 5 000 spelpengar + 20 diamanter' : p.boost ? `×${p.boost} spelpengar på nästa match`
+    : p.extraSpin ? 'En snurr till' : p.diamonds ? `${p.diamonds} ${p.diamonds === 1 ? 'diamant' : 'diamanter'}` : `${p.coins} spelpengar`;
+
+  function prizeIcon(p, x, y, size) {
+    const k = (size || 1);
+    if (p.id === 'jackpot') {
+      const pts = [];
+      for (let i = 0; i < 10; i++) { const r = (i % 2 ? 5 : 11) * k, a = (i * Math.PI) / 5; pts.push(`${(x + Math.sin(a) * r).toFixed(1)},${(y - Math.cos(a) * r).toFixed(1)}`); }
+      return `<polygon points="${pts.join(' ')}" fill="#fff3b0" stroke="#7a5200" stroke-width="1.5"/>`;
+    }
+    if (p.diamonds) return `<polygon points="${x},${y - 10 * k} ${x + 9 * k},${y - 2 * k} ${x},${y + 10 * k} ${x - 9 * k},${y - 2 * k}" fill="#7fe3ff" stroke="#0d5c7a" stroke-width="1.5"/><path d="M${x - 9 * k} ${y - 2 * k}h${18 * k}M${x} ${y - 10 * k}l${-3 * k} ${8 * k} ${3 * k} ${12 * k} ${3 * k} ${-12 * k}z" fill="none" stroke="#0d5c7a" stroke-width="1"/>`;
+    if (p.coins) return `<circle cx="${x}" cy="${y}" r="${9 * k}" fill="#f7c948" stroke="#8a5d00" stroke-width="2"/><circle cx="${x}" cy="${y}" r="${5 * k}" fill="none" stroke="#b07a00" stroke-width="1.5"/>`;
+    if (p.boost) return `<path d="M${x + 2 * k} ${y - 11 * k}l${-8 * k} ${13 * k}h${6 * k}l${-2 * k} ${10 * k}l${8 * k} ${-13 * k}h${-6 * k}z" fill="#ffd23f" stroke="#7a5200" stroke-width="1.2"/>`;
+    return `<path d="M${x - 8 * k} ${y}a${8 * k} ${8 * k} 0 1 1 ${3 * k} ${6 * k}" fill="none" stroke="#fff" stroke-width="${2.5 * k}" stroke-linecap="round"/><path d="M${x - 11 * k} ${y - 2 * k}l${3 * k} ${4 * k} ${3 * k} ${-4 * k}z" fill="#fff"/>`;
+  }
+
+  function wheelSvg(rot) {
+    const n = FB.WHEEL.length, step = 360 / n, r = 150;
+    const pt = (deg, rad) => { const a = (deg * Math.PI) / 180; return [(Math.sin(a) * rad).toFixed(2), (-Math.cos(a) * rad).toFixed(2)]; };
+    const colors = ['#1d6b4f', '#1f5fa8', '#7b3fb8', 'url(#wg-gold)'];
+    let slices = '';
+    FB.WHEEL.forEach((p, i) => {
+      const [x0, y0] = pt(i * step, r), [x1, y1] = pt((i + 1) * step, r);
+      const fill = p.tier === 0 && i % 2 ? '#17573f' : colors[p.tier], jp = p.id === 'jackpot' ? ' jp' : '';
+      slices += `<path d="M0 0L${x0} ${y0}A${r} ${r} 0 0 1 ${x1} ${y1}Z" fill="${fill}" stroke="#0b1b14" stroke-width="2"/>
+        <g transform="rotate(${(i + 0.5) * step})">
+          <text y="-124" class="wl-big${p.label.length > 3 ? ' long' : ''}${jp}">${esc(p.label)}</text>
+          ${prizeIcon(p, 0, -98, 1)}
+          <text y="-74" class="wl-sub${jp}">${esc(p.sub)}</text>
+        </g>`;
+    });
+    let bulbs = '';
+    for (let k = 0; k < 18; k++) { const [x, y] = pt(k * 20 + 10, 159); bulbs += `<circle cx="${x}" cy="${y}" r="3.6" class="bulb${k % 2 ? ' alt' : ''}"/>`; }
+    return `<svg class="wheel" viewBox="-170 -170 340 340" role="img" aria-label="Lyckohjulet med nio vinster">
+      <defs><radialGradient id="wg-gold" cx="0" cy="-120" r="140" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff2a8"/><stop offset="0.5" stop-color="#f2b705"/><stop offset="1" stop-color="#a86f00"/></radialGradient></defs>
+      <circle r="168" fill="#0b1b14"/><circle r="164" fill="#5a3d0a"/>${bulbs}
+      <g id="wheel-rot" transform="rotate(${rot})">${slices}</g>
+      <circle r="30" fill="#0e2a1e" stroke="#ffd23f" stroke-width="5"/>
+      <circle r="10" fill="#ffd23f"/>
+    </svg>`;
+  }
+
+  function renderWheel() {
+    const p = S.profile, wi = wheelInfo(p), res = S.wheelResult;
+    const status = wi.daily ? `Dagens gratissnurr är redo!${wi.extra ? ` Du har också ${wi.extra} extra snurr.` : ''}`
+      : wi.extra ? `Du har ${wi.extra} extra ${wi.extra === 1 ? 'snurr' : 'snurrar'}.`
+        : `Nästa gratissnurr om <b data-until="${wi.until}">${untilText(wi.until - Date.now())}</b>.`;
+    const order = FB.WHEEL.slice().sort((a, b) => a.tier - b.tier || b.weight - a.weight);
+    return `
+      <section class="wheel-layout">
+        <div class="wheel-box"><div class="wheel-pointer" aria-hidden="true"></div>${wheelSvg(S.wheelRot || 0)}</div>
+        <div class="panel wheel-side">
+          <h2>Lyckohjulet</h2>
+          <p class="wheel-status">${status}</p>
+          <button type="button" class="primary big" data-a="spin" ${wi.ready && !S.spinning ? '' : 'disabled'}>${wi.daily || !wi.extra ? 'Snurra' : 'Snurra igen'}</button>
+          <div class="wheel-result${res ? ' show t' + res.tier : ''}" aria-live="polite">${res ? esc(FB.wheelPrizeText(res)) : ''}</div>
+          <h3>Vinster</h3>
+          <ul class="prize-list">${order.map(q => `<li><svg viewBox="-13 -13 26 26" aria-hidden="true">${prizeIcon(q, 0, 0, 1)}</svg><span>${esc(prizeName(q))}</span><em class="tier t${q.tier}">${FB.WHEEL_TIERS[q.tier]}</em></li>`).join('')}</ul>
+          <p class="muted small">Du får en gratissnurr varje dag. Små vinster är vanligast – stora vinster är sällsynta.</p>
+        </div>
+      </section>`;
+  }
+
+  async function spinWheel() {
+    if (S.spinning) return;
+    S.spinning = true;
+    S.wheelResult = null;
+    const btn = app.querySelector('[data-a="spin"]');
+    if (btn) btn.disabled = true;
+    const box = app.querySelector('.wheel-result');
+    if (box) { box.className = 'wheel-result'; box.textContent = ''; }
+    let r;
+    try { r = await api('POST', '/api/wheel/spin'); } catch (e) { S.spinning = false; toast(e.message, 'bad'); render(); return; }
+    const prize = FB.WHEEL[r.index], step = 360 / FB.WHEEL.length;
+    // pilen står upptill: hjulet ska vridas så att vinstens plats (tårtbit + offset) hamnar under pilen
+    const target = (r.index + r.offset) * step, from = S.wheelRot || 0;
+    const delta = ((((-target - from) % 360) + 360) % 360) + 360 * 5;
+    const dur = reducedMotion ? 600 : 5200, t0 = performance.now();
+    const g = app.querySelector('#wheel-rot'), ptr = app.querySelector('.wheel-pointer');
+    let lastSlice = -1;
+    await new Promise(resolve => {
+      const frame = now => {
+        const k = Math.min(1, (now - t0) / dur), rot = from + delta * (1 - Math.pow(1 - k, 4));
+        if (g) g.setAttribute('transform', `rotate(${rot})`);
+        const slice = Math.floor(((((-rot) % 360) + 360) % 360) / step);
+        if (slice !== lastSlice) {
+          if (lastSlice >= 0) { sound.tick(); if (ptr) { ptr.classList.remove('tick'); void ptr.offsetWidth; ptr.classList.add('tick'); } }
+          lastSlice = slice;
+        }
+        if (k < 1 && S.screen === 'hjul') requestAnimationFrame(frame); else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+    S.wheelRot = (from + delta) % 360;
+    S.spinning = false;
+    S.wheelResult = prize;
+    sound.win(prize.tier);
+    if (S.screen === 'hjul') render();
+  }
+
+  // ------------------------------------------------------------------ arenan
+  function renderArena() {
+    const p = S.profile, cur = FB.stadium(p.stadium), next = FB.STADIUMS[cur.level];
+    return `
+      <section class="panel arena-head">
+        <p class="eyebrow">Din arena · nivå ${cur.level} av ${FB.STADIUMS.length}</p>
+        <h2>${esc(cur.name)}</h2>
+        <p>Plats för ${FB.formatCoins(cur.capacity)} åskådare · biljettintäkter ${coins(cur.income)} per match mot datorn</p>
+        ${next ? `<div class="row">
+            <button type="button" class="primary big" data-a="upgrade" ${p.diamonds < next.cost ? 'disabled' : ''}>Bygg ut till ${esc(next.name)} · ${gems(next.cost)}</button>
+            ${p.diamonds < next.cost ? `<span class="muted">Du har ${gems(p.diamonds)} – det fattas ${next.cost - p.diamonds}. Vinn diamanter på <button type="button" class="linkbtn" data-go="hjul">lyckohjulet</button>.</span>` : ''}
+          </div>` : '<p class="good-text">Fullt utbyggd – finare än så här blir det inte!</p>'}
+      </section>
+      <section class="arena-levels">
+        ${FB.STADIUMS.map(a => {
+          const state = a.level < cur.level ? 'built' : a.level === cur.level ? 'current' : a.level === cur.level + 1 ? 'next' : 'locked';
+          return `<article class="arena-level ${state}">
+            <header><b>${a.level}</b><h3>${esc(a.name)}</h3></header>
+            <p>${esc(a.desc)}</p>
+            <p class="small muted">${FB.formatCoins(a.capacity)} platser · ${a.income ? `+${a.income} per match` : 'inga biljettintäkter'}</p>
+            <span class="arena-state">${state === 'current' ? 'Din arena nu' : state === 'built' ? 'Byggd' : gems(a.cost)}</span>
+          </article>`;
+        }).join('')}
       </section>`;
   }
 
@@ -299,11 +561,19 @@
       <section class="panel row-between">
         <div>
           <p>Ditt lag: <b>${teamOvr()}</b> i lagbetyg · formation ${esc(S.profile.formation)}</p>
+          ${matchPerks()}
           ${hurtXI.length ? `<p class="warn">${hurtXI.length} skadade i startelvan: ${hurtXI.map(q => esc(q.name)).join(', ')}. <button type="button" class="linkbtn" data-go="lag">Ändra laget</button></p>` : ''}
           <label class="inline">Matchlängd ${durationSelect('dur-play')}</label>
         </div>
         <button type="button" class="primary big" data-a="start-quick" data-opp-id="${opp}" data-diff-id="${diff}">Spela match</button>
       </section>`;
+  }
+
+  // Extra pengar på nästa match: biljettintäkter från arenan och ×3 från lyckohjulet
+  function matchPerks() {
+    const P = S.profile, a = FB.stadium(P.stadium);
+    return `${a.income ? `<p class="small">Biljettintäkter från ${esc(a.name)}: ${coins(a.income)} per match</p>` : ''}
+      ${P.boost ? `<p class="boost-badge">×${P.boost.mult} spelpengar på den här matchen – från lyckohjulet!</p>` : ''}`;
   }
 
   function durationSelect(id) {
@@ -349,6 +619,7 @@
         <div><p class="eyebrow">${FB.TOURNAMENT_ROUNDS[t.round]} · pott ${coins(t.pot)}</p>
         <h2>${esc(S.profile.club)} mot ${esc(opp.name)}</h2>
         <p class="muted">Motståndarnas betyg ${opp.rating} · ditt lag ${teamOvr()}. Oavgjort avgörs på straffar.</p>
+        ${matchPerks()}
         <label class="inline">Matchlängd ${durationSelect('dur-t')}</label></div>
         <div class="stack"><button type="button" class="primary big" data-a="play-tournament">Spela ${FB.TOURNAMENT_ROUNDS[t.round].toLowerCase()}en</button>
         <button type="button" class="linkbtn danger-text" data-a="leave-tournament">Lämna turneringen (insatsen förloras)</button></div>
@@ -812,6 +1083,7 @@
     sound.setOn(S.settings.sound);
     sound.init();
     comm.voiceOn = S.settings.voice && !!comm.voice;
+    stage.stop();
     app.hidden = true;
     matchRoot.hidden = false;
     document.body.classList.add('in-match');
@@ -888,6 +1160,8 @@
       const out = await api('POST', '/api/match/result', { matchId, gf, ga, shootoutWin, injuries, drinks: res.drinksUsed[0] });
       r.outcome = out.outcome;
       r.reward = out.reward;
+      if (out.ticket) r.notes.push(`Biljettintäkter från ${FB.stadium(S.profile.stadium).name}: +${out.ticket}`);
+      if (out.boost > 1) r.notes.push(`×${out.boost} från lyckohjulet på matchens vinstpengar och biljettintäkter!`);
       if (out.hurt && out.hurt.length) r.notes.push('Skadade: ' + out.hurt.join(', ') + '. Läk dem i Mitt lag → Sjukstugan.');
       if (out.healed && out.healed.length) r.notes.push('Friska igen: ' + out.healed.join(', ') + '.');
       if (out.tournament) {
@@ -941,7 +1215,7 @@
     if (m.coins != null) S.profile.coins = m.coins;
     refundPending();
     S.trade = null;
-    S.friend = { state: 'playing', playing: true, role: m.role, opponent: m.opponent, wager: m.wager };
+    S.friend = { state: 'playing', playing: true, role: m.role, opponent: m.opponent, wager: m.wager, coinsStart: S.profile.coins };
     if (m.role === 'host') {
       const home = FB.teamFromProfile(S.profile);
       const away = m.guestTeam;
@@ -1088,7 +1362,7 @@
   function importTeam(file) {
     file.text()
       .then(txt => { let data; try { data = JSON.parse(txt); } catch (e) { throw new Error('Filen gick inte att läsa.'); } return api('POST', '/api/import', { data }); })
-      .then(r => { S.token = r.token; store.set('fb_token', r.token); S.screen = 'hem'; toast(`${S.profile.club} är inläst.`, 'good'); render(); })
+      .then(r => { S.token = r.token; store.set('fb_token', r.token); go('hem'); toast(`${S.profile.club} är inläst.`, 'good'); })
       .catch(err => toast(err.message, 'bad'));
   }
 
@@ -1102,7 +1376,7 @@
     S.lastResult = {
       title: `Kompismatch mot ${f.opponent}`, home: S.profile.club, away: f.opponent, score: [my, their],
       outcome: my > their ? 'win' : my === their ? 'draw' : 'loss',
-      reward: my > their ? f.wager * 2 + FB.FRIEND_WIN_REWARD : my === their ? 0 : 0,
+      reward: my > their ? Math.max(0, S.profile.coins - f.coinsStart) : 0,
       notes: [st.result.walkover ? 'Matchen avgjordes på walkover.' : '', my === their && f.wager ? 'Insatsen betalades tillbaka.' : ''].filter(Boolean),
       scorers: [], next: 'kompis',
     };
@@ -1125,22 +1399,23 @@
       const r = await api('POST', mode === 'new' ? '/api/register' : '/api/login', { name, pin, club });
       S.token = r.token;
       store.set('fb_token', r.token);
-      S.screen = 'hem';
-      render();
+      go('hem');
       loadLeaderboard();
     } catch (err) { toast(err.message, 'bad'); }
   });
 
   app.addEventListener('click', e => {
+    if (e.target.classList && e.target.classList.contains('hub-panel')) { S.sel.hubPanel = null; return render(); }
     const t = e.target.closest('button, [data-go]');
     if (!t || t.disabled) return;
     sound.init();
     const d = t.dataset;
     if (d.go) return go(d.go);
     if (d.loginMode) { S.sel.loginMode = d.loginMode; return render(); }
+    if (d.panel) { S.sel.hubPanel = d.panel; if (d.panel === 'top') loadLeaderboard(); return render(); }
     if (d.pickTeam) {
       return api('POST', '/api/login', { name: d.pickTeam })
-        .then(r => { S.token = r.token; store.set('fb_token', r.token); S.screen = 'hem'; render(); })
+        .then(r => { S.token = r.token; store.set('fb_token', r.token); go('hem'); })
         .catch(err => toast(err.message, 'bad'));
     }
     if (d.tab) { const [scr, tab] = d.tab.split(':'); S.tab[scr] = tab; S.sel.swap = null; S.sel.sellConfirm = null; render(); if (scr === 'marknad') loadMarket(); return; }
@@ -1156,6 +1431,9 @@
     const P = S.profile;
     switch (a) {
       case 'clear-inbox': return act(() => api('POST', '/api/inbox/clear'));
+      case 'close-panel': S.sel.hubPanel = null; return render();
+      case 'spin': return spinWheel();
+      case 'upgrade': return act(() => api('POST', '/api/stadium/upgrade'), r => `${FB.stadium(r.level).name} är klar!`);
       case 'start-quick': return startQuick(d.oppId, d.diffId);
       case 'start-tournament': return act(() => api('POST', '/api/tournament/start', { fee: +d.feeId }), 'Turneringen har börjat – lycka till!');
       case 'play-tournament': return startTournamentMatch();
@@ -1291,7 +1569,7 @@
 
   window.addEventListener('hashchange', () => {
     const h = location.hash.slice(1);
-    if (!game && h && h !== S.screen && ['hem', 'spela', 'turnering', 'kompis', 'lag', 'affar', 'marknad', 'dokument', 'installningar'].includes(h)) go(h);
+    if (!game && h && h !== S.screen && ['hem', 'hjul', 'arena', 'spela', 'turnering', 'kompis', 'lag', 'affar', 'marknad', 'dokument', 'installningar'].includes(h)) go(h);
   });
 
   // ------------------------------------------------------------------ start
@@ -1309,7 +1587,7 @@
     S.static = await detectStatic();
     document.body.classList.toggle('static', S.static);
     const h = location.hash.slice(1);
-    if (['spela', 'turnering', 'kompis', 'lag', 'affar', 'marknad', 'dokument', 'installningar'].includes(h)) S.screen = h;
+    if (['hjul', 'arena', 'spela', 'turnering', 'kompis', 'lag', 'affar', 'marknad', 'dokument', 'installningar'].includes(h)) S.screen = h;
     if (S.token) {
       try { await api('GET', '/api/profile'); } catch (e) { S.token = null; store.set('fb_token', null); }
     }

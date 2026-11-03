@@ -186,7 +186,7 @@
         side, name: def.name, short: def.short || def.name.slice(0, 3).toUpperCase(),
         kit: def.kit || FB.KITS[0], gkKit: def.gkKit || FB.GK_KITS[side],
         dir: side === 0 ? 1 : -1, ownGoalX: side === 0 ? 0 : L, oppGoalX: side === 0 ? L : 0,
-        formation, score: 0, subsLeft: 5, controlled: null, players: [], bench: [],
+        formation, score: 0, subsLeft: 5, controlled: null, players: [], bench: [], stadium: def.stadium || 0,
         stats: { shots: 0, onTarget: 0, passes: 0, passesOk: 0, tackles: 0, fouls: 0, saves: 0 },
       };
       lineup.forEach((uid, slot) => t.players.push(this.makeMP(byUid.get(uid), side, slot, formation)));
@@ -1751,7 +1751,7 @@
     // ------------------------------------------------------ nätverk (spela mot kompis)
     roster() {
       return this.teams.map(t => ({
-        name: t.name, short: t.short, kit: t.kit, gkKit: t.gkKit, subsLeft: t.subsLeft, drinks: this.drinks[t.side],
+        name: t.name, short: t.short, kit: t.kit, gkKit: t.gkKit, subsLeft: t.subsLeft, drinks: this.drinks[t.side], stadium: t.stadium,
         players: t.players.map(p => ({ uid: p.uid, name: p.name, num: p.num, pos: p.pos, slot: p.slot, skin: p.skin, hair: p.hair, injury: p.injury ? p.injury.sev : 0, sh: p.s.shooting })),
         bench: t.bench.map(q => ({ uid: q.uid, name: q.name, pos: q.pos, num: q.num, ovr: FB.overall(q), injury: q.injury ? q.injury.sev : 0, out: !!q.subbedOut })),
       }));
@@ -1793,7 +1793,7 @@
     return hyp(px - (ax + dx * t), py - (ay + dy * t));
   }
 
-  const API = { Match, ballStep, solveLaunch, groundSpeedFor, L, W, CY, GOAL_HW, GOAL_H, GOAL_DEPTH, BALL_R, BOX_D, BOX_HW, SPOT, STATE_CODE };
+  const API = { Match, ballStep, solveLaunch, groundSpeedFor, L, W, CY, GOAL_HW, GOAL_H, GOAL_DEPTH, BALL_R, BOX_D, BOX_HW, SPOT, STATE_CODE, SKINS, HAIRS };
   FB.Engine = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
